@@ -18,8 +18,16 @@ npm install
 npm run dev
 ```
 
+## Environment
+
+Create a `.env` file in the project root with:
+
+```bash
+VITE_GOJS_LICENSE_KEY=your_gojs_license_key
+```
+
 ## Notes
 
-- The GoJS license key provided for this task is assigned in `src/App.jsx`.
+- The GoJS license key is read from `.env` via `VITE_GOJS_LICENSE_KEY`.
 - The app imports `release/go-module.js` directly, matching the local GoJS distribution checked into this folder.
 - Relevant official local references reviewed for this app were the `entityRelationship.html`, `relationships.html`, `addToPalette.html`, and `dragDropFields.html` samples under `/Users/MacBook/Desktop/goJS/GoJS/samples`.

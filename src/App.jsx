@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from "react";
 import go from "../release/go-module.js";
 import { initialModel, paletteItems } from "./sampleData";
 
-const GOJS_LICENSE_KEY =
-  "298647e1b16248c702d90776423d68f919a175639d841aa30a0413f3ec086106329ee02850d38d93dbac1efe1f79c4d1dbc03a20c748023dee3181d94be1d4a9e53326e6140a4e8df60b7496c9ff29b3ec7e24a2c4b525f2db6a9cf1eaabc18355f7f1";
+const GOJS_LICENSE_KEY = import.meta.env.VITE_GOJS_LICENSE_KEY;
 
-go.Diagram.licenseKey = GOJS_LICENSE_KEY;
+if (GOJS_LICENSE_KEY) {
+  go.Diagram.licenseKey = GOJS_LICENSE_KEY;
+}
 
 const emptySelection = {
   key: "",
