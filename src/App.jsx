@@ -48,25 +48,27 @@ function makeFieldTemplate() {
   return new go.Panel("TableRow", { defaultAlignment: go.Spot.Left }).add(
     new go.TextBlock({
       column: 0,
+      width: 54,
       margin: new go.Margin(4, 8, 4, 10),
       stroke: "#dbeafe",
-      font: "600 11px ui-monospace, SFMono-Regular, Menlo, monospace"
+      font: "600 11px ui-monospace, SFMono-Regular, Menlo, monospace",
+      textAlign: "right"
     }).bind("text", "", (field) => fieldBadges(field).join(" ")),
     new go.TextBlock({
       column: 1,
+      width: 92,
       margin: 4,
       stroke: "#ffffff",
-      font: "600 13px Inter, system-ui, sans-serif",
-      editable: true
-    }, new go.Binding("text", "name").makeTwoWay()),
+      font: "600 13px Inter, system-ui, sans-serif"
+    }).bind("text", "name"),
     new go.TextBlock({
       column: 2,
+      width: 92,
       margin: new go.Margin(4, 10, 4, 4),
       stroke: "#bfdbfe",
       font: "12px ui-monospace, SFMono-Regular, Menlo, monospace",
-      alignment: go.Spot.Right,
-      editable: true
-    }, new go.Binding("text", "type").makeTwoWay())
+      textAlign: "right"
+    }).bind("text", "type")
   );
 }
 
@@ -182,6 +184,7 @@ function createNodeTemplate() {
         new go.Panel("Table", {
           name: "FIELDS",
           padding: new go.Margin(8, 0, 10, 0),
+          defaultAlignment: go.Spot.Left,
           defaultColumnSeparatorStroke: "rgba(148, 163, 184, 0.15)",
           defaultRowSeparatorStroke: "rgba(148, 163, 184, 0.15)",
           itemTemplate: makeFieldTemplate()
@@ -222,8 +225,8 @@ function createLinkTemplate() {
         margin: new go.Margin(4, 8, 4, 8),
         stroke: "#0f172a",
         font: "700 11px ui-monospace, SFMono-Regular, Menlo, monospace",
-        editable: true
-      }, new go.Binding("text", "text").makeTwoWay())
+        editable: false
+      }).bind("text", "text")
     )
   );
 }
