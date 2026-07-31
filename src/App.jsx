@@ -135,7 +135,8 @@ function createNodeTemplate() {
         parameter1: 16,
         fill: "#0f172a",
         stroke: "rgba(226, 232, 240, 0.22)",
-        strokeWidth: 1.5
+        strokeWidth: 1.5,
+        minSize: new go.Size(220, NaN)
       }),
       new go.Panel("Vertical", { stretch: go.GraphObject.Fill }).add(
         new go.Panel("Auto", {
@@ -145,19 +146,19 @@ function createNodeTemplate() {
           new go.Shape("RoundedRectangle", {
             parameter1: 16,
             strokeWidth: 0,
-            stretch: go.GraphObject.Fill
+            stretch: go.GraphObject.Fill,
+            minSize: new go.Size(180, 0)
           }).bind("fill", "color"),
-          new go.Panel("Horizontal", {
+          new go.TextBlock({
+            stroke: "#eff6ff",
+            font: "700 16px Inter, system-ui, sans-serif",
+            editable: false,
+            width: 156,
             margin: new go.Margin(10, 12, 10, 12),
-            stretch: go.GraphObject.Horizontal
-          }).add(
-            new go.TextBlock({
-              stroke: "#eff6ff",
-              font: "700 16px Inter, system-ui, sans-serif",
-              editable: false,
-              margin: new go.Margin(0, 0, 0, 0)
-            }).bind("text", "name")
-          )
+            wrap: go.TextBlock.None,
+            overflow: go.TextBlock.OverflowClip,
+            textAlign: "center"
+          }).bind("text", "name")
         ),
         new go.Panel("Table", {
           name: "FIELDS",
