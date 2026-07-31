@@ -194,16 +194,29 @@ function createNodeTemplate() {
 }
 
 function createLinkTemplate() {
-  return new go.Link({
-    routing: go.Link.AvoidsNodes,
-    curve: go.Link.JumpGap,
-    corner: 10,
-    relinkableFrom: true,
-    relinkableTo: true,
-    reshappable: true,
-    resegmentable: true
-  }).add(
+  return new go.Link(
+    {
+      selectionAdorned: true,
+      routing: go.Link.Orthogonal,
+      curve: go.Link.JumpGap,
+      adjusting: go.Link.Stretch,
+      corner: 10,
+      selectable: true,
+      relinkableFrom: true,
+      relinkableTo: true,
+      reshapable: true,
+      resegmentable: true,
+      toShortLength: 6
+    },
+    new go.Binding("points").makeTwoWay()
+  ).add(
     new go.Shape({
+      isPanelMain: true,
+      stroke: "transparent",
+      strokeWidth: 14
+    }),
+    new go.Shape({
+      isPanelMain: true,
       stroke: "#94a3b8",
       strokeWidth: 2.2
     }),
@@ -344,6 +357,19 @@ function App() {
       new go.Shape("LineH", { stroke: "rgba(148, 163, 184, 0.15)" }),
       new go.Shape("LineV", { stroke: "rgba(148, 163, 184, 0.15)" })
     );
+    diagram.toolManager.linkReshapingTool.isEnabled = true;
+    diagram.toolManager.linkReshapingTool.handleArchetype = new go.Shape("Diamond", {
+      desiredSize: new go.Size(10, 10),
+      fill: "#7dd3fc",
+      stroke: "#0ea5e9",
+      cursor: "move"
+    });
+    diagram.toolManager.linkReshapingTool.midHandleArchetype = new go.Shape("Diamond", {
+      desiredSize: new go.Size(9, 9),
+      fill: "#e0f2fe",
+      stroke: "#38bdf8",
+      cursor: "move"
+    });
     diagram.nodeTemplate = createNodeTemplate();
     diagram.linkTemplate = createLinkTemplate();
 
@@ -406,6 +432,8 @@ function App() {
       const part = event.subject.part;
       if (part instanceof go.Node && part.data) {
         logDebug(`click -> ${part.data.key}`);
+      } else if (part instanceof go.Link) {
+        logDebug("click -> relationship link");
       } else {
         logDebug("click -> non-node object");
       }
