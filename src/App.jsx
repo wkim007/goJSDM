@@ -71,7 +71,7 @@ function makeFieldTemplate() {
 }
 
 function makeSideResizeAdornment() {
-  const handleStyle = {
+  const horizontalHandleStyle = {
     figure: "Rectangle",
     desiredSize: new go.Size(8, 28),
     fill: "#38bdf8",
@@ -80,17 +80,36 @@ function makeSideResizeAdornment() {
     cursor: "col-resize"
   };
 
+  const verticalHandleStyle = {
+    figure: "Rectangle",
+    desiredSize: new go.Size(28, 8),
+    fill: "#38bdf8",
+    stroke: "#e0f2fe",
+    strokeWidth: 1,
+    cursor: "row-resize"
+  };
+
   return new go.Adornment("Spot").add(
     new go.Placeholder(),
-    new go.Shape(handleStyle, {
+    new go.Shape(horizontalHandleStyle, {
       alignment: go.Spot.Left,
       alignmentFocus: go.Spot.Right,
       name: "LEFT"
     }),
-    new go.Shape(handleStyle, {
+    new go.Shape(horizontalHandleStyle, {
       alignment: go.Spot.Right,
       alignmentFocus: go.Spot.Left,
       name: "RIGHT"
+    }),
+    new go.Shape(verticalHandleStyle, {
+      alignment: go.Spot.Top,
+      alignmentFocus: go.Spot.Bottom,
+      name: "TOP"
+    }),
+    new go.Shape(verticalHandleStyle, {
+      alignment: go.Spot.Bottom,
+      alignmentFocus: go.Spot.Top,
+      name: "BOTTOM"
     })
   );
 }
