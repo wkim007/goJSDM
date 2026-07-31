@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import go from "../release/go-module.js";
+import go from "gojs";
 import { initialModel, paletteItems } from "./sampleData";
 
 const GOJS_LICENSE_KEY = import.meta.env.VITE_GOJS_LICENSE_KEY;
@@ -58,7 +58,7 @@ function makeFieldTemplate() {
       stroke: "#ffffff",
       font: "600 13px Inter, system-ui, sans-serif",
       editable: true
-    }).bindTwoWay("text", "name"),
+    }, new go.Binding("text", "name").makeTwoWay()),
     new go.TextBlock({
       column: 2,
       margin: new go.Margin(4, 10, 4, 4),
@@ -66,7 +66,7 @@ function makeFieldTemplate() {
       font: "12px ui-monospace, SFMono-Regular, Menlo, monospace",
       alignment: go.Spot.Right,
       editable: true
-    }).bindTwoWay("text", "type")
+    }, new go.Binding("text", "type").makeTwoWay())
   );
 }
 
@@ -96,7 +96,9 @@ function makeSideResizeAdornment() {
 }
 
 function createNodeTemplate() {
-  return new go.Node("Auto", {
+  return new go.Node(
+    "Auto",
+    {
     locationSpot: go.Spot.Center,
     locationObjectName: "CARD",
     selectionObjectName: "CARD",
@@ -105,7 +107,7 @@ function createNodeTemplate() {
     resizable: true,
     resizeObjectName: "CARD",
     resizeAdornmentTemplate: makeSideResizeAdornment(),
-    layoutConditions: go.LayoutConditions.Standard & ~go.LayoutConditions.NodeSized,
+    layoutConditions: go.Part.LayoutStandard & ~go.Part.LayoutNodeSized,
     fromSpot: go.Spot.LeftRightSides,
     toSpot: go.Spot.LeftRightSides,
     cursor: "move",
@@ -124,8 +126,9 @@ function createNodeTemplate() {
         shape.stroke = "rgba(226, 232, 240, 0.22)";
       }
     }
-  })
-    .bindTwoWay("location", "loc", go.Point.parse, go.Point.stringify)
+    },
+    new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify)
+  )
     .add(
       new go.Shape("RoundedRectangle", {
         name: "CARD",
@@ -134,19 +137,19 @@ function createNodeTemplate() {
         stroke: "rgba(226, 232, 240, 0.22)",
         strokeWidth: 1.5
       }),
-      new go.Panel("Vertical", { stretch: go.Stretch.Fill }).add(
+      new go.Panel("Vertical", { stretch: go.GraphObject.Fill }).add(
         new go.Panel("Auto", {
-          stretch: go.Stretch.Horizontal,
+          stretch: go.GraphObject.Horizontal,
           cursor: "move"
         }).add(
           new go.Shape("RoundedRectangle", {
             parameter1: 16,
             strokeWidth: 0,
-            stretch: go.Stretch.Fill
+            stretch: go.GraphObject.Fill
           }).bind("fill", "color"),
           new go.Panel("Horizontal", {
             margin: new go.Margin(10, 12, 10, 12),
-            stretch: go.Stretch.Horizontal
+            stretch: go.GraphObject.Horizontal
           }).add(
             new go.TextBlock({
               stroke: "#eff6ff",
@@ -169,8 +172,8 @@ function createNodeTemplate() {
 
 function createLinkTemplate() {
   return new go.Link({
-    routing: go.Routing.AvoidsNodes,
-    curve: go.Curve.JumpGap,
+    routing: go.Link.AvoidsNodes,
+    curve: go.Link.JumpGap,
     corner: 10,
     relinkableFrom: true,
     relinkableTo: true,
@@ -200,7 +203,7 @@ function createLinkTemplate() {
         stroke: "#0f172a",
         font: "700 11px ui-monospace, SFMono-Regular, Menlo, monospace",
         editable: true
-      }).bindTwoWay("text", "text")
+      }, new go.Binding("text", "text").makeTwoWay())
     )
   );
 }
@@ -311,7 +314,7 @@ function App() {
       "commandHandler.copiesTree": false,
       "grid.visible": true,
       "grid.gridCellSize": new go.Size(20, 20),
-      "toolManager.mouseWheelBehavior": go.WheelMode.Zoom
+      "toolManager.mouseWheelBehavior": go.ToolManager.WheelZoom
     });
 
     diagram.grid = new go.Panel("Grid").add(
