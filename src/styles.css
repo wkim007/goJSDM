@@ -48,7 +48,6 @@ button.ghost {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 360px;
   gap: 20px;
   min-height: 100vh;
   padding: 20px;
@@ -60,6 +59,37 @@ button.ghost {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.left-rail {
+  min-width: 0;
+}
+
+.right-rail {
+  min-width: 0;
+}
+
+.workspace {
+  min-width: 0;
+}
+
+.panel-divider {
+  width: 10px;
+  min-height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.18), rgba(125, 211, 252, 0.34), rgba(37, 99, 235, 0.18));
+  border: 1px solid rgba(125, 211, 252, 0.14);
+  cursor: col-resize;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.5);
+}
+
+.panel-divider:hover {
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.28), rgba(186, 230, 253, 0.4), rgba(56, 189, 248, 0.28));
+}
+
+body.is-resizing-panels {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .hero,

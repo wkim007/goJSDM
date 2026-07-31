@@ -15,6 +15,13 @@ const emptySelection = {
   fields: []
 };
 
+const LEFT_RAIL_DEFAULT = 280;
+const RIGHT_RAIL_DEFAULT = 360;
+const LEFT_RAIL_MIN = 220;
+const LEFT_RAIL_MAX = 520;
+const RIGHT_RAIL_MIN = 260;
+const RIGHT_RAIL_MAX = 560;
+
 function cloneModel(source = initialModel) {
   return {
     nodeDataArray: structuredClone(source.nodeDataArray),
@@ -63,6 +70,31 @@ function makeFieldTemplate() {
   );
 }
 
+function makeSideResizeAdornment() {
+  const handleStyle = {
+    figure: "Rectangle",
+    desiredSize: new go.Size(8, 28),
+    fill: "#38bdf8",
+    stroke: "#e0f2fe",
+    strokeWidth: 1,
+    cursor: "col-resize"
+  };
+
+  return new go.Adornment("Spot").add(
+    new go.Placeholder(),
+    new go.Shape(handleStyle, {
+      alignment: go.Spot.Left,
+      alignmentFocus: go.Spot.Right,
+      name: "LEFT"
+    }),
+    new go.Shape(handleStyle, {
+      alignment: go.Spot.Right,
+      alignmentFocus: go.Spot.Left,
+      name: "RIGHT"
+    })
+  );
+}
+
 function createNodeTemplate() {
   return new go.Node("Auto", {
     locationSpot: go.Spot.Center,
@@ -72,6 +104,7 @@ function createNodeTemplate() {
     movable: true,
     resizable: true,
     resizeObjectName: "CARD",
+    resizeAdornmentTemplate: makeSideResizeAdornment(),
     layoutConditions: go.LayoutConditions.Standard & ~go.LayoutConditions.NodeSized,
     fromSpot: go.Spot.LeftRightSides,
     toSpot: go.Spot.LeftRightSides,
@@ -187,11 +220,48 @@ function App() {
   const paletteRef = useRef(null);
   const overviewRef = useRef(null);
   const isApplyingRef = useRef(false);
+  const resizeStateRef = useRef(null);
 
   const [model, setModel] = useState(() => cloneModel());
   const [selectedNode, setSelectedNode] = useState(emptySelection);
   const [schemaJson, setSchemaJson] = useState(() => JSON.stringify(initialModel, null, 2));
   const [debugMessages, setDebugMessages] = useState([]);
+  const [leftRailWidth, setLeftRailWidth] = useState(LEFT_RAIL_DEFAULT);
+  const [rightRailWidth, setRightRailWidth] = useState(RIGHT_RAIL_DEFAULT);
+
+  useEffect(() => {
+    const handlePointerMove = (event) => {
+      const resizeState = resizeStateRef.current;
+      if (!resizeState) {
+        return;
+      }
+
+      if (resizeState.side === "left") {
+        const nextWidth = Math.min(Math.max(event.clientX - resizeState.startX + resizeState.startWidth, LEFT_RAIL_MIN), LEFT_RAIL_MAX);
+        setLeftRailWidth(nextWidth);
+        return;
+      }
+
+      const nextWidth = Math.min(
+        Math.max(resizeState.startWidth - (event.clientX - resizeState.startX), RIGHT_RAIL_MIN),
+        RIGHT_RAIL_MAX
+      );
+      setRightRailWidth(nextWidth);
+    };
+
+    const handlePointerUp = () => {
+      resizeStateRef.current = null;
+      document.body.classList.remove("is-resizing-panels");
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, []);
 
   useEffect(() => {
     const logDebug = (message) => {
@@ -405,8 +475,22 @@ function App() {
     setSelectedNode(emptySelection);
   };
 
+  const startPanelResize = (side) => (event) => {
+    resizeStateRef.current = {
+      side,
+      startX: event.clientX,
+      startWidth: side === "left" ? leftRailWidth : rightRailWidth
+    };
+    document.body.classList.add("is-resizing-panels");
+  };
+
   return (
-    <div className="app-shell">
+    <div
+      className="app-shell"
+      style={{
+        gridTemplateColumns: `${leftRailWidth}px 10px minmax(0, 1fr) 10px ${rightRailWidth}px`
+      }}
+    >
       <aside className="left-rail">
         <div className="panel">
           <div className="panel-header">
@@ -424,6 +508,14 @@ function App() {
           <div ref={overviewDivRef} className="overview-component" />
         </div>
       </aside>
+
+      <div
+        className="panel-divider"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize left sidebar"
+        onPointerDown={startPanelResize("left")}
+      />
 
       <main className="workspace">
         <section className="hero">
@@ -451,6 +543,14 @@ function App() {
           <div ref={diagramDivRef} className="diagram-component" />
         </section>
       </main>
+
+      <div
+        className="panel-divider"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize right sidebar"
+        onPointerDown={startPanelResize("right")}
+      />
 
       <aside className="right-rail">
         <div className="panel">
