@@ -66,12 +66,15 @@ function makeFieldTemplate() {
 function createNodeTemplate() {
   return new go.Node("Auto", {
     locationSpot: go.Spot.Center,
-    selectionAdorned: false,
+    locationObjectName: "CARD",
+    selectionObjectName: "CARD",
+    selectionAdorned: true,
+    movable: true,
     resizable: true,
+    resizeObjectName: "CARD",
+    layoutConditions: go.LayoutConditions.Standard & ~go.LayoutConditions.NodeSized,
     fromSpot: go.Spot.LeftRightSides,
     toSpot: go.Spot.LeftRightSides,
-    fromLinkable: true,
-    toLinkable: true,
     cursor: "move",
     shadowVisible: true,
     shadowColor: "rgba(15, 23, 42, 0.25)",
@@ -99,18 +102,25 @@ function createNodeTemplate() {
         strokeWidth: 1.5
       }),
       new go.Panel("Vertical", { stretch: go.Stretch.Fill }).add(
-        new go.Panel("Auto", { stretch: go.Stretch.Horizontal }).add(
+        new go.Panel("Auto", {
+          stretch: go.Stretch.Horizontal,
+          cursor: "move"
+        }).add(
           new go.Shape("RoundedRectangle", {
             parameter1: 16,
             strokeWidth: 0,
             stretch: go.Stretch.Fill
           }).bind("fill", "color"),
-          new go.Panel("Horizontal", { margin: new go.Margin(10, 12, 10, 12) }).add(
+          new go.Panel("Horizontal", {
+            margin: new go.Margin(10, 12, 10, 12),
+            stretch: go.Stretch.Horizontal
+          }).add(
             new go.TextBlock({
               stroke: "#eff6ff",
               font: "700 16px Inter, system-ui, sans-serif",
-              editable: true
-            }).bindTwoWay("text", "name")
+              editable: false,
+              margin: new go.Margin(0, 0, 0, 0)
+            }).bind("text", "name")
           )
         ),
         new go.Panel("Table", {
@@ -181,8 +191,15 @@ function App() {
   const [model, setModel] = useState(() => cloneModel());
   const [selectedNode, setSelectedNode] = useState(emptySelection);
   const [schemaJson, setSchemaJson] = useState(() => JSON.stringify(initialModel, null, 2));
+  const [debugMessages, setDebugMessages] = useState([]);
 
   useEffect(() => {
+    const logDebug = (message) => {
+      const entry = `${new Date().toLocaleTimeString()}: ${message}`;
+      console.log(`[gojs-debug] ${entry}`);
+      setDebugMessages((current) => [entry, ...current].slice(0, 16));
+    };
+
     const updateSelection = () => {
       const diagram = diagramRef.current;
       if (!(diagram instanceof go.Diagram)) {
@@ -191,8 +208,12 @@ function App() {
       const part = diagram.selection.first();
       if (part instanceof go.Node && part.data) {
         setSelectedNode(structuredClone(part.data));
+        logDebug(
+          `selection changed -> ${part.data.key} at ${part.location.x.toFixed(1)}, ${part.location.y.toFixed(1)} movable=${part.movable}`
+        );
         return;
       }
+      logDebug("selection cleared");
       setSelectedNode(emptySelection);
     };
 
@@ -211,6 +232,7 @@ function App() {
     };
 
     const diagram = new go.Diagram(diagramDivRef.current, {
+      allowMove: true,
       "undoManager.isEnabled": true,
       "linkingTool.isUnconnectedLinkValid": false,
       "relinkingTool.isUnconnectedLinkValid": false,
@@ -219,11 +241,7 @@ function App() {
       "commandHandler.copiesTree": false,
       "grid.visible": true,
       "grid.gridCellSize": new go.Size(20, 20),
-      "toolManager.mouseWheelBehavior": go.WheelMode.Zoom,
-      layout: new go.ForceDirectedLayout({
-        defaultSpringLength: 120,
-        defaultElectricalCharge: 140
-      })
+      "toolManager.mouseWheelBehavior": go.WheelMode.Zoom
     });
 
     diagram.grid = new go.Panel("Grid").add(
@@ -232,6 +250,40 @@ function App() {
     );
     diagram.nodeTemplate = createNodeTemplate();
     diagram.linkTemplate = createLinkTemplate();
+
+    const draggingTool = diagram.toolManager.draggingTool;
+    const originalDoActivate = draggingTool.doActivate.bind(draggingTool);
+    draggingTool.doActivate = function doActivateWithDebug() {
+      const part = this.currentPart;
+      if (part instanceof go.Node && part.data) {
+        logDebug(
+          `drag start -> ${part.data.key} from ${part.location.x.toFixed(1)}, ${part.location.y.toFixed(1)} movable=${part.movable}`
+        );
+      } else {
+        logDebug("drag start -> no node part detected");
+      }
+      return originalDoActivate();
+    };
+
+    const originalDoDeactivate = draggingTool.doDeactivate.bind(draggingTool);
+    draggingTool.doDeactivate = function doDeactivateWithDebug() {
+      const selection = diagram.selection.first();
+      if (selection instanceof go.Node && selection.data) {
+        logDebug(
+          `drag end -> ${selection.data.key} now at ${selection.location.x.toFixed(1)}, ${selection.location.y.toFixed(1)}`
+        );
+      } else {
+        logDebug("drag end -> no selected node");
+      }
+      return originalDoDeactivate();
+    };
+
+    const linkingTool = diagram.toolManager.linkingTool;
+    const originalLinkActivate = linkingTool.doActivate.bind(linkingTool);
+    linkingTool.doActivate = function doActivateWithDebug() {
+      logDebug("link tool activated");
+      return originalLinkActivate();
+    };
 
     const palette = new go.Palette(paletteDivRef.current, {
       "animationManager.isEnabled": false,
@@ -254,8 +306,35 @@ function App() {
     overviewRef.current = overview;
 
     diagram.addDiagramListener("ChangedSelection", updateSelection);
+    diagram.addDiagramListener("ObjectSingleClicked", (event) => {
+      const part = event.subject.part;
+      if (part instanceof go.Node && part.data) {
+        logDebug(`click -> ${part.data.key}`);
+      } else {
+        logDebug("click -> non-node object");
+      }
+    });
+    diagram.addDiagramListener("SelectionMoved", () => {
+      const part = diagram.selection.first();
+      if (part instanceof go.Node && part.data) {
+        logDebug(
+          `selection moved -> ${part.data.key} at ${part.location.x.toFixed(1)}, ${part.location.y.toFixed(1)}`
+        );
+      } else {
+        logDebug("selection moved event fired");
+      }
+    });
+    diagram.addDiagramListener("PartResized", () => {
+      const part = diagram.selection.first();
+      if (part instanceof go.Node && part.data) {
+        logDebug(`resized -> ${part.data.key}`);
+      } else {
+        logDebug("part resized");
+      }
+    });
     diagram.addModelChangedListener((event) => {
       if (event.isTransactionFinished) {
+        logDebug(`model transaction -> ${event.oldValue || event.modelChange || event.propertyName || "updated"}`);
         pushStateFromDiagram();
       }
     });
@@ -310,8 +389,14 @@ function App() {
     if (!(diagram instanceof go.Diagram)) {
       return;
     }
+    const layout = new go.ForceDirectedLayout({
+      defaultSpringLength: 120,
+      defaultElectricalCharge: 140,
+      isInitial: false,
+      isOngoing: false
+    });
     diagram.startTransaction("auto layout");
-    diagram.layoutDiagram(true);
+    layout.doLayout(diagram);
     diagram.commitTransaction("auto layout");
   };
 
@@ -402,6 +487,24 @@ function App() {
             <h2>Model JSON</h2>
           </div>
           <pre className="json-preview">{schemaJson}</pre>
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <p className="eyebrow">Debug</p>
+            <h2>Drag Diagnostics</h2>
+          </div>
+          <div className="debug-log">
+            {debugMessages.length > 0 ? (
+              debugMessages.map((message, index) => (
+                <div key={`${message}-${index}`} className="debug-line">
+                  {message}
+                </div>
+              ))
+            ) : (
+              <div className="debug-line">No diagram events yet.</div>
+            )}
+          </div>
         </div>
       </aside>
     </div>
