@@ -51,18 +51,161 @@ class FieldDraggingTool extends go.DraggingTool {
     this.temporaryPart = null;
     this.sourceNode = null;
     this.draggedField = null;
+    this.logDebug = null;
+    this.mouseDownObject = null;
+    this.mouseDownPoint = null;
+  }
+
+  describeObject(obj) {
+    if (obj === null) {
+      return "null";
+    }
+    const parts = [];
+    let current = obj;
+    let guard = 0;
+    while (current !== null && guard < 12) {
+      const name = current.name ? `#${current.name}` : "";
+      const type = current.type ? `:${current.type}` : "";
+      parts.push(`${current.constructor.name}${name}${type}`);
+      current = current.panel;
+      guard += 1;
+    }
+    return parts.join(" <- ");
+  }
+
+  findNamedAncestor(obj, name) {
+    let current = obj;
+    while (current !== null && current.name !== name) {
+      current = current.panel;
+    }
+    return current && current.name === name ? current : null;
+  }
+
+  findFieldRowAt(point) {
+    const diagram = this.diagram;
+    let obj = diagram.findObjectAt(point);
+    while (obj !== null && obj.name !== "FIELD_ROW") {
+      obj = obj.panel;
+    }
+    if (obj !== null && obj.name === "FIELD_ROW" && obj.data) {
+      return obj;
+    }
+    return null;
+  }
+
+  findFieldRowFromInput(input) {
+    if (!input) {
+      return null;
+    }
+    const target = input.targetObject || null;
+    const fromTarget = this.findNamedAncestor(target, "FIELD_ROW");
+    if (fromTarget !== null && fromTarget.data) {
+      return fromTarget;
+    }
+    return this.findFieldRowAt(input.documentPoint);
+  }
+
+  findFieldRowFromMouseDown() {
+    const fromTarget = this.findNamedAncestor(this.mouseDownObject, "FIELD_ROW");
+    if (fromTarget !== null && fromTarget.data) {
+      return fromTarget;
+    }
+    if (this.mouseDownPoint) {
+      return this.findFieldRowAt(this.mouseDownPoint);
+    }
+    return null;
+  }
+
+  findHeaderHandleAt(point) {
+    const diagram = this.diagram;
+    let obj = diagram.findObjectAt(point);
+    while (obj !== null && obj.name !== "ENTITY_DRAG_HANDLE") {
+      obj = obj.panel;
+    }
+    if (obj !== null && obj.name === "ENTITY_DRAG_HANDLE") {
+      return obj;
+    }
+    return null;
+  }
+
+  findHeaderHandleFromInput(input) {
+    if (!input) {
+      return null;
+    }
+    const target = input.targetObject || null;
+    const fromTarget = this.findNamedAncestor(target, "ENTITY_DRAG_HANDLE");
+    if (fromTarget !== null) {
+      return fromTarget;
+    }
+    return this.findHeaderHandleAt(input.documentPoint);
+  }
+
+  findHeaderHandleFromMouseDown() {
+    const fromTarget = this.findNamedAncestor(this.mouseDownObject, "ENTITY_DRAG_HANDLE");
+    if (fromTarget !== null) {
+      return fromTarget;
+    }
+    if (this.mouseDownPoint) {
+      return this.findHeaderHandleAt(this.mouseDownPoint);
+    }
+    return null;
+  }
+
+  rememberMouseDown(obj, point) {
+    this.mouseDownObject = obj || null;
+    this.mouseDownPoint = point ? point.copy() : null;
+    if (this.logDebug) {
+      this.logDebug(
+        `mouse down captured -> target=${this.describeObject(this.mouseDownObject)} | point=${
+          this.mouseDownPoint ? `${this.mouseDownPoint.x.toFixed(1)},${this.mouseDownPoint.y.toFixed(1)}` : "none"
+        }`
+      );
+    }
+  }
+
+  canStart() {
+    const diagram = this.diagram;
+    if (!(diagram instanceof go.Diagram)) {
+      return false;
+    }
+
+    const input = diagram.lastInput;
+    if (!input.left) {
+      return false;
+    }
+    if (diagram.isReadOnly || diagram.isModelReadOnly || !diagram.allowMove) {
+      return false;
+    }
+    if (!this.isBeyondDragSize()) {
+      return false;
+    }
+
+    const downInput = diagram.firstInput;
+    const fieldRow = this.findFieldRowFromMouseDown() || this.findFieldRowFromInput(downInput);
+    const headerHandle = this.findHeaderHandleFromMouseDown() || this.findHeaderHandleFromInput(downInput);
+    const result = fieldRow !== null || headerHandle !== null;
+
+    if (this.logDebug) {
+      this.logDebug(
+        `canStart -> ${result} | capturedTarget=${this.describeObject(this.mouseDownObject)} | downTarget=${this.describeObject(
+          downInput?.targetObject || null
+        )} | currentTarget=${this.describeObject(input.targetObject || null)} | fieldRow=${
+          fieldRow?.data?.name || "none"
+        } | header=${headerHandle ? "yes" : "no"}`
+      );
+    }
+
+    return result;
   }
 
   findDraggablePart() {
     const diagram = this.diagram;
-    let obj = diagram.findObjectAt(diagram.lastInput.documentPoint);
-    while (obj !== null && obj.type !== go.Panel.TableRow) {
-      obj = obj.panel;
-    }
+    const downInput = diagram.firstInput;
+    const point = this.mouseDownPoint || downInput.documentPoint;
+    const obj = this.findFieldRowFromMouseDown() || this.findFieldRowFromInput(downInput);
 
     if (
       obj !== null &&
-      obj.type === go.Panel.TableRow &&
       obj.data &&
       this.fieldTemplate !== null &&
       this.temporaryPart === null
@@ -71,17 +214,55 @@ class FieldDraggingTool extends go.DraggingTool {
       this.temporaryPart = tempPart;
       this.sourceNode = obj.part;
       this.draggedField = obj.data;
-      tempPart.location = diagram.lastInput.documentPoint;
+      tempPart.location = point;
       diagram.add(tempPart);
       tempPart.data = obj.data;
+      if (this.logDebug) {
+        this.logDebug(`field drag prepared -> ${obj.data.name} | source=${this.describeObject(downInput?.targetObject || null)}`);
+      }
       return tempPart;
     }
 
-    return super.findDraggablePart();
+    const headerHandle = this.findHeaderHandleFromMouseDown() || this.findHeaderHandleFromInput(downInput);
+    if (headerHandle !== null && headerHandle.part instanceof go.Node) {
+      if (this.logDebug) {
+        this.logDebug(`node drag prepared from header -> ${headerHandle.part.data?.key || "unknown"}`);
+      }
+      return headerHandle.part;
+    }
+
+    if (this.logDebug) {
+      this.logDebug(
+        `findDraggablePart -> none | downTarget=${this.describeObject(downInput?.targetObject || null)} | point=${point.x.toFixed(1)},${point.y.toFixed(1)}`
+      );
+    }
+
+    return null;
   }
 
   doActivate() {
+    if (this.currentPart === null) {
+      const preparedPart = this.findDraggablePart();
+      if (preparedPart !== null) {
+        this.currentPart = preparedPart;
+      }
+      if (this.logDebug) {
+        this.logDebug(
+          `doActivate prep -> currentPart=${this.currentPart ? this.currentPart.constructor.name : "null"} | temporary=${
+            this.temporaryPart ? "yes" : "no"
+          } | draggedField=${this.draggedField?.name || "none"}`
+        );
+      }
+    }
+
     if (this.temporaryPart === null) {
+      if (this.logDebug) {
+        this.logDebug(
+          `doActivate fallback -> currentPart=${this.currentPart ? this.currentPart.constructor.name : "null"} | target=${this.describeObject(
+            this.mouseDownObject
+          )}`
+        );
+      }
       return super.doActivate();
     }
     const diagram = this.diagram;
@@ -92,6 +273,13 @@ class FieldDraggingTool extends go.DraggingTool {
     this.draggedParts = map;
     this.startTransaction("Drag Field");
     diagram.isMouseCaptured = true;
+    if (this.logDebug && this.draggedField) {
+      this.logDebug(
+        `field drag start -> ${this.draggedField.name} | first=${diagram.firstInput.documentPoint.x.toFixed(1)},${diagram.firstInput.documentPoint.y.toFixed(
+          1
+        )} | last=${diagram.lastInput.documentPoint.x.toFixed(1)},${diagram.lastInput.documentPoint.y.toFixed(1)}`
+      );
+    }
   }
 
   doDeactivate() {
@@ -105,6 +293,8 @@ class FieldDraggingTool extends go.DraggingTool {
     this.temporaryPart = null;
     this.sourceNode = null;
     this.draggedField = null;
+    this.mouseDownObject = null;
+    this.mouseDownPoint = null;
     super.doDeactivate();
   }
 
@@ -129,6 +319,13 @@ class FieldDraggingTool extends go.DraggingTool {
     }
 
     const diagram = this.diagram;
+    const draggedField = this.draggedField;
+
+    if (this.temporaryPart !== null) {
+      diagram.remove(this.temporaryPart);
+      this.temporaryPart = null;
+    }
+
     const destinationNode = diagram.findPartAt(diagram.lastInput.documentPoint, false);
     const hitObject = diagram.findObjectAt(diagram.lastInput.documentPoint);
     let dropGroup = null;
@@ -142,6 +339,10 @@ class FieldDraggingTool extends go.DraggingTool {
         dropGroup = "column";
         break;
       }
+      if (panel.name === "PK_DIVIDER") {
+        dropGroup = draggedField && draggedField.pk ? "column" : "pk";
+        break;
+      }
       panel = panel.panel;
     }
 
@@ -152,29 +353,40 @@ class FieldDraggingTool extends go.DraggingTool {
       this.sourceNode instanceof go.Node &&
       this.sourceNode.data &&
       Array.isArray(this.sourceNode.data.fields) &&
-      this.draggedField &&
+      draggedField &&
       dropGroup
     ) {
       const model = diagram.model;
       const sourceFields = this.sourceNode.data.fields;
       const destinationFields = destinationNode.data.fields;
-      const sourceIndex = sourceFields.indexOf(this.draggedField);
+      const sourceIndex = sourceFields.indexOf(draggedField);
 
       if (sourceIndex >= 0) {
         model.removeArrayItem(sourceFields, sourceIndex);
-        model.setDataProperty(this.draggedField, "pk", dropGroup === "pk");
+        model.setDataProperty(draggedField, "pk", dropGroup === "pk");
 
         const insertIndex =
           dropGroup === "pk"
             ? destinationFields.reduce((lastPkIndex, field, index) => (field.pk ? index + 1 : lastPkIndex), 0)
             : destinationFields.length;
 
-        model.insertArrayItem(destinationFields, insertIndex, this.draggedField);
+        model.insertArrayItem(destinationFields, insertIndex, draggedField);
         model.updateTargetBindings(this.sourceNode.data);
         if (destinationNode !== this.sourceNode) {
           model.updateTargetBindings(destinationNode.data);
         }
+        if (this.logDebug) {
+          this.logDebug(`field dropped -> ${draggedField.name} to ${dropGroup.toUpperCase()} in ${destinationNode.data.key}`);
+        }
+      } else if (this.logDebug) {
+        this.logDebug(`field drop failed -> ${draggedField.name} not found in source`);
       }
+    } else if (this.logDebug && draggedField) {
+      this.logDebug(
+        `field drop missed -> ${draggedField.name} | hit=${this.describeObject(hitObject)} | destination=${
+          destinationNode instanceof go.Node ? destinationNode.data?.key || "node" : "none"
+        } | group=${dropGroup || "none"}`
+      );
     }
 
     this.transactionResult = "Drag Field";
@@ -186,9 +398,9 @@ function makeFieldTemplate() {
   return new go.Panel(
     "TableRow",
     {
+      name: "FIELD_ROW",
       background: "rgba(0, 0, 0, 0)",
-      isActionable: true,
-      cursor: "pointer",
+      cursor: "grab",
       click: (_, panel) => {
         const node = panel.part;
         if (!(node instanceof go.Node) || !node.data || !panel.data) {
@@ -272,7 +484,7 @@ function makeCornerResizeAdornment() {
   );
 }
 
-function createNodeTemplate() {
+function createNodeTemplate(fieldTemplate) {
   return new go.Node(
     "Auto",
     {
@@ -287,7 +499,7 @@ function createNodeTemplate() {
       layoutConditions: go.Part.LayoutStandard & ~go.Part.LayoutNodeSized,
       fromSpot: go.Spot.LeftRightSides,
       toSpot: go.Spot.LeftRightSides,
-      cursor: "move",
+      cursor: "default",
       shadowVisible: true,
       shadowColor: "rgba(0, 0, 0, 0.35)",
       shadowOffset: new go.Point(0, 18),
@@ -330,6 +542,7 @@ function createNodeTemplate() {
       }),
       new go.Panel("Vertical", { stretch: go.GraphObject.Fill }).add(
         new go.Panel("Auto", {
+          name: "ENTITY_DRAG_HANDLE",
           stretch: go.GraphObject.Horizontal,
           cursor: "move"
         }).add(
@@ -372,9 +585,10 @@ function createNodeTemplate() {
             stretch: go.GraphObject.Horizontal,
             defaultAlignment: go.Spot.Left,
             defaultRowSeparatorStroke: "rgba(133, 160, 191, 0.12)",
-            itemTemplate: makeFieldTemplate()
+            itemTemplate: fieldTemplate
           }).bind("itemArray", "fields", (fields) => fields.filter((field) => field.pk)),
           new go.Panel("Vertical", {
+            name: "PK_DIVIDER",
             stretch: go.GraphObject.Horizontal,
             margin: new go.Margin(10, 0, 10, 0)
           })
@@ -400,7 +614,7 @@ function createNodeTemplate() {
             stretch: go.GraphObject.Horizontal,
             defaultAlignment: go.Spot.Left,
             defaultRowSeparatorStroke: "rgba(133, 160, 191, 0.12)",
-            itemTemplate: makeFieldTemplate()
+            itemTemplate: fieldTemplate
           }).bind("itemArray", "fields", (fields) => fields.filter((field) => !field.pk))
         )
       )
@@ -524,6 +738,23 @@ function App() {
       setDebugMessages((current) => [entry, ...current].slice(0, 16));
     };
 
+    const describeObject = (obj) => {
+      if (obj === null) {
+        return "null";
+      }
+      const parts = [];
+      let current = obj;
+      let guard = 0;
+      while (current !== null && guard < 12) {
+        const name = current.name ? `#${current.name}` : "";
+        const type = current.type ? `:${current.type}` : "";
+        parts.push(`${current.constructor.name}${name}${type}`);
+        current = current.panel;
+        guard += 1;
+      }
+      return parts.join(" <- ");
+    };
+
     const updateSelection = () => {
       const diagram = diagramRef.current;
       if (!(diagram instanceof go.Diagram)) {
@@ -572,6 +803,18 @@ function App() {
       new go.Shape("LineH", { stroke: "rgba(148, 163, 184, 0.15)" }),
       new go.Shape("LineV", { stroke: "rgba(148, 163, 184, 0.15)" })
     );
+    const fieldTemplate = makeFieldTemplate();
+    const fieldDraggingTool = new FieldDraggingTool(fieldTemplate);
+    fieldDraggingTool.logDebug = logDebug;
+    diagram.toolManager.draggingTool = fieldDraggingTool;
+    const toolManager = diagram.toolManager;
+    const originalToolManagerDoMouseDown = toolManager.doMouseDown.bind(toolManager);
+    toolManager.doMouseDown = function doMouseDownWithFieldCapture() {
+      const point = diagram.lastInput.documentPoint.copy();
+      const obj = diagram.findObjectAt(point);
+      fieldDraggingTool.rememberMouseDown(obj, point);
+      return originalToolManagerDoMouseDown();
+    };
     diagram.toolManager.linkReshapingTool.isEnabled = true;
     diagram.toolManager.linkReshapingTool.handleArchetype = new go.Shape("Diamond", {
       desiredSize: new go.Size(10, 10),
@@ -585,7 +828,7 @@ function App() {
       stroke: "#38bdf8",
       cursor: "move"
     });
-    diagram.nodeTemplate = createNodeTemplate();
+    diagram.nodeTemplate = createNodeTemplate(fieldTemplate);
     diagram.linkTemplate = createLinkTemplate();
 
     const draggingTool = diagram.toolManager.draggingTool;
@@ -630,7 +873,7 @@ function App() {
         cellSize: new go.Size(1, 1),
         spacing: new go.Size(12, 12)
       }),
-      nodeTemplate: createNodeTemplate()
+      nodeTemplate: createNodeTemplate(makeFieldTemplate())
     });
 
     const overview = new go.Overview(overviewDivRef.current, {
@@ -646,11 +889,11 @@ function App() {
     diagram.addDiagramListener("ObjectSingleClicked", (event) => {
       const part = event.subject.part;
       if (part instanceof go.Node && part.data) {
-        logDebug(`click -> ${part.data.key}`);
+        logDebug(`click -> ${part.data.key} | target=${describeObject(event.subject)}`);
       } else if (part instanceof go.Link) {
-        logDebug("click -> relationship link");
+        logDebug(`click -> relationship link | target=${describeObject(event.subject)}`);
       } else {
-        logDebug("click -> non-node object");
+        logDebug(`click -> non-node object | target=${describeObject(event.subject)}`);
       }
     });
     diagram.addDiagramListener("SelectionMoved", () => {
@@ -671,6 +914,12 @@ function App() {
         logDebug("part resized");
       }
     });
+    const clickSelectingTool = diagram.toolManager.clickSelectingTool;
+    const originalStandardMouseSelect = clickSelectingTool.standardMouseSelect.bind(clickSelectingTool);
+    clickSelectingTool.standardMouseSelect = function standardMouseSelectWithDebug() {
+      logDebug(`mouse select -> target=${describeObject(diagram.lastInput.targetObject || null)}`);
+      return originalStandardMouseSelect();
+    };
     diagram.addModelChangedListener((event) => {
       if (event.isTransactionFinished) {
         logDebug(`model transaction -> ${event.oldValue || event.modelChange || event.propertyName || "updated"}`);
