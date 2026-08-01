@@ -328,9 +328,15 @@ class FieldDraggingTool extends go.DraggingTool {
 
     const destinationNode = diagram.findPartAt(diagram.lastInput.documentPoint, false);
     const hitObject = diagram.findObjectAt(diagram.lastInput.documentPoint);
+    const targetRow = this.findNamedAncestor(hitObject, "FIELD_ROW");
+    const targetField = targetRow?.data || null;
     let dropGroup = null;
     let panel = hitObject;
     while (panel !== null) {
+      if (panel.name === "FIELD_ROW" && panel.data) {
+        dropGroup = panel.data.pk ? "pk" : "column";
+        break;
+      }
       if (panel.name === "PK_FIELDS") {
         dropGroup = "pk";
         break;
@@ -365,10 +371,18 @@ class FieldDraggingTool extends go.DraggingTool {
         model.removeArrayItem(sourceFields, sourceIndex);
         model.setDataProperty(draggedField, "pk", dropGroup === "pk");
 
-        const insertIndex =
-          dropGroup === "pk"
-            ? destinationFields.reduce((lastPkIndex, field, index) => (field.pk ? index + 1 : lastPkIndex), 0)
-            : destinationFields.length;
+        let insertIndex;
+        if (targetField && destinationFields.includes(targetField)) {
+          const targetIndex = destinationFields.indexOf(targetField);
+          const targetBounds = targetRow?.actualBounds;
+          const placeAfter = targetBounds ? diagram.lastInput.documentPoint.y > targetBounds.centerY : false;
+          insertIndex = targetIndex + (placeAfter ? 1 : 0);
+        } else if (dropGroup === "pk") {
+          insertIndex = destinationFields.reduce((lastPkIndex, field, index) => (field.pk ? index + 1 : lastPkIndex), 0);
+        } else {
+          const nonPkStartIndex = destinationFields.findIndex((field) => !field.pk);
+          insertIndex = nonPkStartIndex >= 0 ? destinationFields.length : destinationFields.length;
+        }
 
         model.insertArrayItem(destinationFields, insertIndex, draggedField);
 
@@ -391,7 +405,11 @@ class FieldDraggingTool extends go.DraggingTool {
         model.updateTargetBindings(draggedField);
 
         if (this.logDebug) {
-          this.logDebug(`field dropped -> ${draggedField.name} to ${dropGroup.toUpperCase()} in ${destinationNode.data.key}`);
+          this.logDebug(
+            `field dropped -> ${draggedField.name} to ${dropGroup.toUpperCase()} in ${destinationNode.data.key} at index ${insertIndex}${
+              targetField ? ` near ${targetField.name}` : ""
+            }`
+          );
         }
       } else if (this.logDebug) {
         this.logDebug(`field drop failed -> ${draggedField.name} not found in source`);
