@@ -44,74 +44,199 @@ function createGraphLinksModel(source) {
   return graphModel;
 }
 
+class FieldDraggingTool extends go.DraggingTool {
+  constructor(fieldTemplate) {
+    super();
+    this.fieldTemplate = fieldTemplate;
+    this.temporaryPart = null;
+    this.sourceNode = null;
+    this.draggedField = null;
+  }
+
+  findDraggablePart() {
+    const diagram = this.diagram;
+    let obj = diagram.findObjectAt(diagram.lastInput.documentPoint);
+    while (obj !== null && obj.type !== go.Panel.TableRow) {
+      obj = obj.panel;
+    }
+
+    if (
+      obj !== null &&
+      obj.type === go.Panel.TableRow &&
+      obj.data &&
+      this.fieldTemplate !== null &&
+      this.temporaryPart === null
+    ) {
+      const tempPart = new go.Part("Table", { layerName: "Tool", locationSpot: go.Spot.Center }).add(this.fieldTemplate.copy());
+      this.temporaryPart = tempPart;
+      this.sourceNode = obj.part;
+      this.draggedField = obj.data;
+      tempPart.location = diagram.lastInput.documentPoint;
+      diagram.add(tempPart);
+      tempPart.data = obj.data;
+      return tempPart;
+    }
+
+    return super.findDraggablePart();
+  }
+
+  doActivate() {
+    if (this.temporaryPart === null) {
+      return super.doActivate();
+    }
+    const diagram = this.diagram;
+    this.standardMouseSelect();
+    this.isActive = true;
+    const map = new go.Map();
+    map.set(this.temporaryPart, new go.DraggingInfo(diagram.lastInput.documentPoint.copy()));
+    this.draggedParts = map;
+    this.startTransaction("Drag Field");
+    diagram.isMouseCaptured = true;
+  }
+
+  doDeactivate() {
+    if (this.temporaryPart === null) {
+      return super.doDeactivate();
+    }
+    const diagram = this.diagram;
+    if (this.temporaryPart !== null) {
+      diagram.remove(this.temporaryPart);
+    }
+    this.temporaryPart = null;
+    this.sourceNode = null;
+    this.draggedField = null;
+    super.doDeactivate();
+  }
+
+  doMouseMove() {
+    if (!this.isActive) {
+      return;
+    }
+    if (this.temporaryPart === null) {
+      return super.doMouseMove();
+    }
+    const diagram = this.diagram;
+    const offset = diagram.lastInput.documentPoint.copy().subtract(diagram.firstInput.documentPoint);
+    this.moveParts(this.draggedParts, offset, false);
+  }
+
+  doMouseUp() {
+    if (!this.isActive) {
+      return;
+    }
+    if (this.temporaryPart === null) {
+      return super.doMouseUp();
+    }
+
+    const diagram = this.diagram;
+    const destinationNode = diagram.findPartAt(diagram.lastInput.documentPoint, false);
+    const hitObject = diagram.findObjectAt(diagram.lastInput.documentPoint);
+    let dropGroup = null;
+    let panel = hitObject;
+    while (panel !== null) {
+      if (panel.name === "PK_FIELDS") {
+        dropGroup = "pk";
+        break;
+      }
+      if (panel.name === "NONPK_FIELDS") {
+        dropGroup = "column";
+        break;
+      }
+      panel = panel.panel;
+    }
+
+    if (
+      destinationNode instanceof go.Node &&
+      destinationNode.data &&
+      Array.isArray(destinationNode.data.fields) &&
+      this.sourceNode instanceof go.Node &&
+      this.sourceNode.data &&
+      Array.isArray(this.sourceNode.data.fields) &&
+      this.draggedField &&
+      dropGroup
+    ) {
+      const model = diagram.model;
+      const sourceFields = this.sourceNode.data.fields;
+      const destinationFields = destinationNode.data.fields;
+      const sourceIndex = sourceFields.indexOf(this.draggedField);
+
+      if (sourceIndex >= 0) {
+        model.removeArrayItem(sourceFields, sourceIndex);
+        model.setDataProperty(this.draggedField, "pk", dropGroup === "pk");
+
+        const insertIndex =
+          dropGroup === "pk"
+            ? destinationFields.reduce((lastPkIndex, field, index) => (field.pk ? index + 1 : lastPkIndex), 0)
+            : destinationFields.length;
+
+        model.insertArrayItem(destinationFields, insertIndex, this.draggedField);
+        model.updateTargetBindings(this.sourceNode.data);
+        if (destinationNode !== this.sourceNode) {
+          model.updateTargetBindings(destinationNode.data);
+        }
+      }
+    }
+
+    this.transactionResult = "Drag Field";
+    this.stopTool();
+  }
+}
+
 function makeFieldTemplate() {
-  return new go.Panel("TableRow", { defaultAlignment: go.Spot.Left }).add(
-    new go.TextBlock({
+  return new go.Panel(
+    "TableRow",
+    {
+      background: "transparent"
+    }
+  ).add(
+    new go.Panel("Auto", {
       column: 0,
-      width: 54,
-      margin: new go.Margin(4, 8, 4, 10),
-      stroke: "#dbeafe",
-      font: "600 11px ui-monospace, SFMono-Regular, Menlo, monospace",
-      textAlign: "right"
-    }).bind("text", "", (field) => fieldBadges(field).join(" ")),
+      margin: new go.Margin(6, 8, 6, 12)
+    }).add(
+      new go.Shape("RoundedRectangle", {
+        fill: "#334155",
+        strokeWidth: 0,
+        parameter1: 10,
+        minSize: new go.Size(36, 20)
+      }).bind("fill", "pk", (pk) => (pk ? "#6b5b2c" : "#334155")),
+      new go.TextBlock({
+        width: 36,
+        margin: new go.Margin(3, 8, 3, 8),
+        stroke: "#f8fafc",
+        font: "700 10px ui-monospace, SFMono-Regular, Menlo, monospace",
+        textAlign: "center"
+      }).bind("text", "", (field) => (field && field.pk ? "PK" : "COL"))
+    ),
     new go.TextBlock({
       column: 1,
-      width: 92,
-      margin: 4,
+      width: 138,
+      margin: new go.Margin(6, 8, 6, 0),
       stroke: "#ffffff",
       font: "600 13px Inter, system-ui, sans-serif"
     }).bind("text", "name"),
     new go.TextBlock({
       column: 2,
-      width: 92,
-      margin: new go.Margin(4, 10, 4, 4),
-      stroke: "#bfdbfe",
+      width: 96,
+      margin: new go.Margin(6, 10, 6, 8),
+      stroke: "#bfd1ea",
       font: "12px ui-monospace, SFMono-Regular, Menlo, monospace",
       textAlign: "right"
     }).bind("text", "type")
   );
 }
 
-function makeSideResizeAdornment() {
-  const horizontalHandleStyle = {
-    figure: "Rectangle",
-    desiredSize: new go.Size(8, 28),
-    fill: "#38bdf8",
-    stroke: "#e0f2fe",
-    strokeWidth: 1,
-    cursor: "col-resize"
-  };
-
-  const verticalHandleStyle = {
-    figure: "Rectangle",
-    desiredSize: new go.Size(28, 8),
-    fill: "#38bdf8",
-    stroke: "#e0f2fe",
-    strokeWidth: 1,
-    cursor: "row-resize"
-  };
-
+function makeCornerResizeAdornment() {
   return new go.Adornment("Spot").add(
     new go.Placeholder(),
-    new go.Shape(horizontalHandleStyle, {
-      alignment: go.Spot.Left,
-      alignmentFocus: go.Spot.Right,
-      name: "LEFT"
-    }),
-    new go.Shape(horizontalHandleStyle, {
-      alignment: go.Spot.Right,
-      alignmentFocus: go.Spot.Left,
-      name: "RIGHT"
-    }),
-    new go.Shape(verticalHandleStyle, {
-      alignment: go.Spot.Top,
-      alignmentFocus: go.Spot.Bottom,
-      name: "TOP"
-    }),
-    new go.Shape(verticalHandleStyle, {
-      alignment: go.Spot.Bottom,
-      alignmentFocus: go.Spot.Top,
-      name: "BOTTOM"
+    new go.Shape("Rectangle", {
+      alignment: go.Spot.BottomRight,
+      alignmentFocus: go.Spot.Center,
+      desiredSize: new go.Size(14, 14),
+      fill: "#38bdf8",
+      stroke: "#e0f2fe",
+      strokeWidth: 1,
+      cursor: "se-resize",
+      name: "BOTTOM_RIGHT"
     })
   );
 }
@@ -127,7 +252,7 @@ function createNodeTemplate() {
     movable: true,
     resizable: true,
     resizeObjectName: "CARD",
-    resizeAdornmentTemplate: makeSideResizeAdornment(),
+    resizeAdornmentTemplate: makeCornerResizeAdornment(),
     layoutConditions: go.Part.LayoutStandard & ~go.Part.LayoutNodeSized,
     fromSpot: go.Spot.LeftRightSides,
     toSpot: go.Spot.LeftRightSides,
@@ -181,14 +306,41 @@ function createNodeTemplate() {
             textAlign: "center"
           }).bind("text", "name")
         ),
-        new go.Panel("Table", {
+        new go.Panel("Vertical", {
           name: "FIELDS",
           padding: new go.Margin(8, 0, 10, 0),
           defaultAlignment: go.Spot.Left,
-          defaultColumnSeparatorStroke: "rgba(148, 163, 184, 0.15)",
-          defaultRowSeparatorStroke: "rgba(148, 163, 184, 0.15)",
-          itemTemplate: makeFieldTemplate()
-        }).bind("itemArray", "fields")
+          stretch: go.GraphObject.Horizontal
+        }).add(
+          new go.Panel("Table", {
+            name: "PK_FIELDS",
+            stretch: go.GraphObject.Horizontal,
+            defaultAlignment: go.Spot.Left,
+            defaultRowSeparatorStroke: "rgba(148, 163, 184, 0.12)",
+            itemTemplate: makeFieldTemplate()
+          }).bind("itemArray", "fields", (fields) => fields.filter((field) => field.pk)),
+          new go.Panel("Vertical", {
+            stretch: go.GraphObject.Horizontal,
+            margin: new go.Margin(8, 8, 8, 8)
+          })
+            .bind("visible", "fields", (fields) => fields.some((field) => field.pk) && fields.some((field) => !field.pk))
+            .add(
+              new go.Shape("RoundedRectangle", {
+                stretch: go.GraphObject.Horizontal,
+                height: 12,
+                fill: "rgba(51, 65, 85, 0.62)",
+                stroke: "rgba(148, 163, 184, 0.14)",
+                parameter1: 6
+              })
+            ),
+          new go.Panel("Table", {
+            name: "NONPK_FIELDS",
+            stretch: go.GraphObject.Horizontal,
+            defaultAlignment: go.Spot.Left,
+            defaultRowSeparatorStroke: "rgba(148, 163, 184, 0.12)",
+            itemTemplate: makeFieldTemplate()
+          }).bind("itemArray", "fields", (fields) => fields.filter((field) => !field.pk))
+        )
       )
     );
 }
