@@ -186,7 +186,21 @@ function makeFieldTemplate() {
   return new go.Panel(
     "TableRow",
     {
-      background: "rgba(0, 0, 0, 0)"
+      background: "rgba(0, 0, 0, 0)",
+      isActionable: true,
+      cursor: "pointer",
+      click: (_, panel) => {
+        const node = panel.part;
+        if (!(node instanceof go.Node) || !node.data || !panel.data) {
+          return;
+        }
+        const model = node.diagram?.model;
+        if (!model) {
+          return;
+        }
+        model.setDataProperty(node.data, "selectedFieldName", panel.data.name);
+        model.updateTargetBindings(node.data);
+      }
     }
   ).add(
     new go.Shape("RoundedRectangle", {
@@ -194,9 +208,18 @@ function makeFieldTemplate() {
       columnSpan: 3,
       stretch: go.GraphObject.Fill,
       fill: "rgba(41, 55, 72, 0.18)",
+      stroke: "rgba(0, 0, 0, 0)",
       strokeWidth: 0,
       parameter1: 10
-    }),
+    })
+      .bind("fill", "", (field, shape) => {
+        const nodeData = shape.part?.data;
+        return nodeData && nodeData.selectedFieldName === field.name ? "rgba(74, 130, 139, 0.92)" : "rgba(41, 55, 72, 0.18)";
+      })
+      .bind("stroke", "", (field, shape) => {
+        const nodeData = shape.part?.data;
+        return nodeData && nodeData.selectedFieldName === field.name ? "rgba(121, 208, 201, 0.58)" : "rgba(0, 0, 0, 0)";
+      }),
     new go.Panel("Auto", {
       column: 0,
       margin: new go.Margin(6, 8, 6, 12)
