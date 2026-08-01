@@ -371,10 +371,25 @@ class FieldDraggingTool extends go.DraggingTool {
             : destinationFields.length;
 
         model.insertArrayItem(destinationFields, insertIndex, draggedField);
-        model.updateTargetBindings(this.sourceNode.data);
-        if (destinationNode !== this.sourceNode) {
+
+        // Force a full row-template refresh after PK/non-PK regrouping so reused
+        // item panels do not keep stale badge colors from their previous field.
+        if (destinationNode === this.sourceNode) {
+          model.setDataProperty(destinationNode.data, "fields", [...destinationFields]);
+          model.updateTargetBindings(destinationNode.data);
+        } else {
+          model.setDataProperty(this.sourceNode.data, "fields", [...sourceFields]);
+          model.setDataProperty(destinationNode.data, "fields", [...destinationFields]);
+          model.updateTargetBindings(this.sourceNode.data);
           model.updateTargetBindings(destinationNode.data);
         }
+
+        sourceFields.forEach((field) => model.updateTargetBindings(field));
+        if (destinationNode !== this.sourceNode) {
+          destinationFields.forEach((field) => model.updateTargetBindings(field));
+        }
+        model.updateTargetBindings(draggedField);
+
         if (this.logDebug) {
           this.logDebug(`field dropped -> ${draggedField.name} to ${dropGroup.toUpperCase()} in ${destinationNode.data.key}`);
         }
@@ -441,7 +456,7 @@ function makeFieldTemplate() {
         strokeWidth: 0,
         parameter1: 10,
         minSize: new go.Size(36, 20)
-      }).bind("fill", "pk", (pk) => (pk ? "#7b6740" : "#42536a")),
+      }).bind("fill", "", (field) => (field && field.pk ? "#7b6740" : "#42536a")),
       new go.TextBlock({
         width: 36,
         margin: new go.Margin(3, 8, 3, 8),
