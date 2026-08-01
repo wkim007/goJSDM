@@ -425,8 +425,13 @@ function makeFieldTemplate() {
         if (!model) {
           return;
         }
-        model.setDataProperty(node.data, "selectedFieldName", panel.data.name);
-        model.updateTargetBindings(node.data);
+        model.nodeDataArray.forEach((nodeData) => {
+          const nextValue = nodeData === node.data ? panel.data.name : "";
+          if ((nodeData.selectedFieldName || "") !== nextValue) {
+            model.setDataProperty(nodeData, "selectedFieldName", nextValue);
+            model.updateTargetBindings(nodeData);
+          }
+        });
       }
     }
   ).add(
@@ -770,6 +775,25 @@ function App() {
       return parts.join(" <- ");
     };
 
+    const clearFieldSelectionHighlights = () => {
+      const diagram = diagramRef.current;
+      if (!(diagram instanceof go.Diagram)) {
+        return;
+      }
+      const model = diagram.model;
+      let changed = false;
+      diagram.model.nodeDataArray.forEach((nodeData) => {
+        if (nodeData && nodeData.selectedFieldName) {
+          model.setDataProperty(nodeData, "selectedFieldName", "");
+          model.updateTargetBindings(nodeData);
+          changed = true;
+        }
+      });
+      if (changed) {
+        logDebug("field selection cleared");
+      }
+    };
+
     const updateSelection = () => {
       const diagram = diagramRef.current;
       if (!(diagram instanceof go.Diagram)) {
@@ -902,6 +926,20 @@ function App() {
 
     diagram.addDiagramListener("ChangedSelection", updateSelection);
     diagram.addDiagramListener("ObjectSingleClicked", (event) => {
+      let current = event.subject;
+      let clickedFieldRow = false;
+      while (current !== null) {
+        if (current.name === "FIELD_ROW") {
+          clickedFieldRow = true;
+          break;
+        }
+        current = current.panel;
+      }
+
+      if (!clickedFieldRow) {
+        clearFieldSelectionHighlights();
+      }
+
       const part = event.subject.part;
       if (part instanceof go.Node && part.data) {
         logDebug(`click -> ${part.data.key} | target=${describeObject(event.subject)}`);
@@ -910,6 +948,10 @@ function App() {
       } else {
         logDebug(`click -> non-node object | target=${describeObject(event.subject)}`);
       }
+    });
+    diagram.addDiagramListener("BackgroundSingleClicked", () => {
+      clearFieldSelectionHighlights();
+      logDebug("background click");
     });
     diagram.addDiagramListener("SelectionMoved", () => {
       const part = diagram.selection.first();
