@@ -614,20 +614,27 @@ function createNodeTemplate(fieldTemplate) {
           })
             .bind("visible", "fields", (fields) => fields.some((field) => field.pk) && fields.some((field) => !field.pk))
             .add(
-              new go.Shape("RoundedRectangle", {
+              new go.Panel("Spot", {
                 stretch: go.GraphObject.Horizontal,
-                height: 14,
-                fill: "rgba(54, 70, 89, 0.72)",
-                stroke: "rgba(133, 160, 191, 0.10)",
-                parameter1: 6
-              }),
-              new go.TextBlock({
-                alignment: go.Spot.Center,
-                margin: new go.Margin(-13, 0, 0, 0),
-                stroke: "#8ea3bd",
-                font: "600 10px Inter, system-ui, sans-serif",
-                text: "Drop here to switch PK"
-              })
+                height: 12
+              }).add(
+                new go.Shape("RoundedRectangle", {
+                  stretch: go.GraphObject.Horizontal,
+                  height: 10,
+                  fill: "rgba(44, 58, 76, 0.88)",
+                  stroke: "rgba(146, 173, 201, 0.08)",
+                  strokeWidth: 1,
+                  parameter1: 999
+                }),
+                new go.Shape("RoundedRectangle", {
+                  width: 72,
+                  height: 4,
+                  fill: "rgba(125, 211, 252, 0.28)",
+                  stroke: "rgba(0, 0, 0, 0)",
+                  parameter1: 999,
+                  alignment: go.Spot.Center
+                })
+              )
             ),
           new go.Panel("Table", {
             name: "NONPK_FIELDS",
