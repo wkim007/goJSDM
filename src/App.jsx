@@ -366,22 +366,40 @@ class FieldDraggingTool extends go.DraggingTool {
       const sourceFields = this.sourceNode.data.fields;
       const destinationFields = destinationNode.data.fields;
       const sourceIndex = sourceFields.indexOf(draggedField);
+      const originalTargetIndex = targetField ? sourceFields.indexOf(targetField) : -1;
 
       if (sourceIndex >= 0) {
         model.removeArrayItem(sourceFields, sourceIndex);
         model.setDataProperty(draggedField, "pk", dropGroup === "pk");
 
         let insertIndex;
+        let dropDetails = "default tail placement";
         if (targetField && destinationFields.includes(targetField)) {
           const targetIndex = destinationFields.indexOf(targetField);
-          const targetBounds = targetRow?.actualBounds;
-          const placeAfter = targetBounds ? diagram.lastInput.documentPoint.y > targetBounds.centerY : false;
-          insertIndex = targetIndex + (placeAfter ? 1 : 0);
+
+          if (destinationNode === this.sourceNode) {
+            // Same-entity reorder must use the original row positions before the
+            // dragged item is removed, otherwise the target index shifts and the
+            // move can collapse back to its old position.
+            const placeAfter = sourceIndex < originalTargetIndex;
+            insertIndex = targetIndex + (placeAfter ? 1 : 0);
+            dropDetails = `target=${targetField.name} originalTargetIndex=${originalTargetIndex} shiftedTargetIndex=${targetIndex} sameEntity=true sourceIndex=${sourceIndex} placeAfter=${placeAfter}`;
+          } else {
+            const targetBounds = targetRow?.actualBounds;
+            const pointerY = diagram.lastInput.documentPoint.y;
+            const rowTop = targetBounds ? targetBounds.y : 0;
+            const rowHeight = targetBounds ? targetBounds.height : 0;
+            const relativeY = targetBounds && rowHeight > 0 ? (pointerY - rowTop) / rowHeight : 0.5;
+            const placeAfter = relativeY >= 0.68;
+            insertIndex = targetIndex + (placeAfter ? 1 : 0);
+            dropDetails = `target=${targetField.name} targetIndex=${targetIndex} sameEntity=false relativeY=${relativeY.toFixed(2)} placeAfter=${placeAfter}`;
+          }
         } else if (dropGroup === "pk") {
           insertIndex = destinationFields.reduce((lastPkIndex, field, index) => (field.pk ? index + 1 : lastPkIndex), 0);
+          dropDetails = `pk tail target, insert after last PK at ${insertIndex}`;
         } else {
-          const nonPkStartIndex = destinationFields.findIndex((field) => !field.pk);
-          insertIndex = nonPkStartIndex >= 0 ? destinationFields.length : destinationFields.length;
+          insertIndex = destinationFields.length;
+          dropDetails = `non-pk tail target, insert at end ${insertIndex}`;
         }
 
         model.insertArrayItem(destinationFields, insertIndex, draggedField);
@@ -408,7 +426,7 @@ class FieldDraggingTool extends go.DraggingTool {
           this.logDebug(
             `field dropped -> ${draggedField.name} to ${dropGroup.toUpperCase()} in ${destinationNode.data.key} at index ${insertIndex}${
               targetField ? ` near ${targetField.name}` : ""
-            }`
+            } | sourceIndex=${sourceIndex} | ${dropDetails}`
           );
         }
       } else if (this.logDebug) {
