@@ -186,9 +186,17 @@ function makeFieldTemplate() {
   return new go.Panel(
     "TableRow",
     {
-      background: "transparent"
+      background: "rgba(0, 0, 0, 0)"
     }
   ).add(
+    new go.Shape("RoundedRectangle", {
+      column: 0,
+      columnSpan: 3,
+      stretch: go.GraphObject.Fill,
+      fill: "rgba(41, 55, 72, 0.18)",
+      strokeWidth: 0,
+      parameter1: 10
+    }),
     new go.Panel("Auto", {
       column: 0,
       margin: new go.Margin(6, 8, 6, 12)
@@ -198,7 +206,7 @@ function makeFieldTemplate() {
         strokeWidth: 0,
         parameter1: 10,
         minSize: new go.Size(36, 20)
-      }).bind("fill", "pk", (pk) => (pk ? "#6b5b2c" : "#334155")),
+      }).bind("fill", "pk", (pk) => (pk ? "#7b6740" : "#42536a")),
       new go.TextBlock({
         width: 36,
         margin: new go.Margin(3, 8, 3, 8),
@@ -209,16 +217,16 @@ function makeFieldTemplate() {
     ),
     new go.TextBlock({
       column: 1,
-      width: 138,
+      width: 154,
       margin: new go.Margin(6, 8, 6, 0),
       stroke: "#ffffff",
       font: "600 13px Inter, system-ui, sans-serif"
     }).bind("text", "name"),
     new go.TextBlock({
       column: 2,
-      width: 96,
+      width: 102,
       margin: new go.Margin(6, 10, 6, 8),
-      stroke: "#bfd1ea",
+      stroke: "#aec2da",
       font: "12px ui-monospace, SFMono-Regular, Menlo, monospace",
       textAlign: "right"
     }).bind("text", "type")
@@ -245,33 +253,46 @@ function createNodeTemplate() {
   return new go.Node(
     "Auto",
     {
-    locationSpot: go.Spot.Center,
-    locationObjectName: "CARD",
-    selectionObjectName: "CARD",
-    selectionAdorned: true,
-    movable: true,
-    resizable: true,
-    resizeObjectName: "CARD",
-    resizeAdornmentTemplate: makeCornerResizeAdornment(),
-    layoutConditions: go.Part.LayoutStandard & ~go.Part.LayoutNodeSized,
-    fromSpot: go.Spot.LeftRightSides,
-    toSpot: go.Spot.LeftRightSides,
-    cursor: "move",
-    shadowVisible: true,
-    shadowColor: "rgba(15, 23, 42, 0.25)",
-    shadowOffset: new go.Point(0, 14),
-    mouseEnter: (_, node) => {
-      const shape = node.findObject("CARD");
-      if (shape) {
-        shape.stroke = "#f8fafc";
+      locationSpot: go.Spot.Center,
+      locationObjectName: "CARD",
+      selectionObjectName: "CARD",
+      selectionAdorned: false,
+      movable: true,
+      resizable: true,
+      resizeObjectName: "CARD",
+      resizeAdornmentTemplate: makeCornerResizeAdornment(),
+      layoutConditions: go.Part.LayoutStandard & ~go.Part.LayoutNodeSized,
+      fromSpot: go.Spot.LeftRightSides,
+      toSpot: go.Spot.LeftRightSides,
+      cursor: "move",
+      shadowVisible: true,
+      shadowColor: "rgba(0, 0, 0, 0.35)",
+      shadowOffset: new go.Point(0, 18),
+      selectionChanged: (part) => {
+        const card = part.findObject("CARD");
+        if (card) {
+          card.stroke = part.isSelected ? "#f1bf52" : "rgba(133, 160, 191, 0.22)";
+          card.strokeWidth = part.isSelected ? 2 : 1.5;
+        }
+      },
+      mouseEnter: (_, node) => {
+        if (node.isSelected) {
+          return;
+        }
+        const shape = node.findObject("CARD");
+        if (shape) {
+          shape.stroke = "rgba(232, 237, 245, 0.72)";
+        }
+      },
+      mouseLeave: (_, node) => {
+        if (node.isSelected) {
+          return;
+        }
+        const shape = node.findObject("CARD");
+        if (shape) {
+          shape.stroke = "rgba(133, 160, 191, 0.22)";
+        }
       }
-    },
-    mouseLeave: (_, node) => {
-      const shape = node.findObject("CARD");
-      if (shape) {
-        shape.stroke = "rgba(226, 232, 240, 0.22)";
-      }
-    }
     },
     new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify)
   )
@@ -279,10 +300,10 @@ function createNodeTemplate() {
       new go.Shape("RoundedRectangle", {
         name: "CARD",
         parameter1: 16,
-        fill: "#0f172a",
-        stroke: "rgba(226, 232, 240, 0.22)",
+        fill: "#243142",
+        stroke: "rgba(133, 160, 191, 0.22)",
         strokeWidth: 1.5,
-        minSize: new go.Size(220, NaN)
+        minSize: new go.Size(300, NaN)
       }),
       new go.Panel("Vertical", { stretch: go.GraphObject.Fill }).add(
         new go.Panel("Auto", {
@@ -293,22 +314,33 @@ function createNodeTemplate() {
             parameter1: 16,
             strokeWidth: 0,
             stretch: go.GraphObject.Fill,
-            minSize: new go.Size(180, 0)
+            minSize: new go.Size(220, 0),
+            margin: new go.Margin(0, 0, 0, 0)
           }).bind("fill", "color"),
-          new go.TextBlock({
-            stroke: "#eff6ff",
-            font: "700 16px Inter, system-ui, sans-serif",
-            editable: false,
-            width: 156,
-            margin: new go.Margin(10, 12, 10, 12),
-            wrap: go.TextBlock.None,
-            overflow: go.TextBlock.OverflowClip,
-            textAlign: "center"
-          }).bind("text", "name")
+          new go.Panel("Horizontal", {
+            stretch: go.GraphObject.Horizontal,
+            margin: new go.Margin(10, 14, 10, 14)
+          }).add(
+            new go.TextBlock({
+              stroke: "#eff6ff",
+              font: "800 16px Inter, system-ui, sans-serif",
+              editable: false,
+              width: 212,
+              wrap: go.TextBlock.None,
+              overflow: go.TextBlock.OverflowClip
+            }).bind("text", "name"),
+            new go.TextBlock({
+              stroke: "rgba(239, 246, 255, 0.74)",
+              font: "700 15px Inter, system-ui, sans-serif",
+              text: "×",
+              alignment: go.Spot.Right,
+              textAlign: "right"
+            })
+          )
         ),
         new go.Panel("Vertical", {
           name: "FIELDS",
-          padding: new go.Margin(8, 0, 10, 0),
+          padding: new go.Margin(10, 10, 12, 10),
           defaultAlignment: go.Spot.Left,
           stretch: go.GraphObject.Horizontal
         }).add(
@@ -316,28 +348,35 @@ function createNodeTemplate() {
             name: "PK_FIELDS",
             stretch: go.GraphObject.Horizontal,
             defaultAlignment: go.Spot.Left,
-            defaultRowSeparatorStroke: "rgba(148, 163, 184, 0.12)",
+            defaultRowSeparatorStroke: "rgba(133, 160, 191, 0.12)",
             itemTemplate: makeFieldTemplate()
           }).bind("itemArray", "fields", (fields) => fields.filter((field) => field.pk)),
           new go.Panel("Vertical", {
             stretch: go.GraphObject.Horizontal,
-            margin: new go.Margin(8, 8, 8, 8)
+            margin: new go.Margin(10, 0, 10, 0)
           })
             .bind("visible", "fields", (fields) => fields.some((field) => field.pk) && fields.some((field) => !field.pk))
             .add(
               new go.Shape("RoundedRectangle", {
                 stretch: go.GraphObject.Horizontal,
-                height: 12,
-                fill: "rgba(51, 65, 85, 0.62)",
-                stroke: "rgba(148, 163, 184, 0.14)",
+                height: 14,
+                fill: "rgba(54, 70, 89, 0.72)",
+                stroke: "rgba(133, 160, 191, 0.10)",
                 parameter1: 6
+              }),
+              new go.TextBlock({
+                alignment: go.Spot.Center,
+                margin: new go.Margin(-13, 0, 0, 0),
+                stroke: "#8ea3bd",
+                font: "600 10px Inter, system-ui, sans-serif",
+                text: "Drop here to switch PK"
               })
             ),
           new go.Panel("Table", {
             name: "NONPK_FIELDS",
             stretch: go.GraphObject.Horizontal,
             defaultAlignment: go.Spot.Left,
-            defaultRowSeparatorStroke: "rgba(148, 163, 184, 0.12)",
+            defaultRowSeparatorStroke: "rgba(133, 160, 191, 0.12)",
             itemTemplate: makeFieldTemplate()
           }).bind("itemArray", "fields", (fields) => fields.filter((field) => !field.pk))
         )
@@ -369,22 +408,23 @@ function createLinkTemplate() {
     }),
     new go.Shape({
       isPanelMain: true,
-      stroke: "#94a3b8",
-      strokeWidth: 2.2
+      stroke: "#88d6dc",
+      strokeWidth: 2.4
     }),
     new go.Shape({
       toArrow: "Standard",
-      fill: "#94a3b8",
+      fill: "#88d6dc",
       stroke: null,
-      scale: 1.1
+      scale: 1.08
     }),
     new go.Panel("Auto", {
       segmentIndex: NaN,
       segmentFraction: 0.5
     }).add(
       new go.Shape("RoundedRectangle", {
-        fill: "#e2e8f0",
-        strokeWidth: 0
+        fill: "#e9eef7",
+        stroke: "rgba(0,0,0,0.06)",
+        strokeWidth: 1
       }),
       new go.TextBlock({
         margin: new go.Margin(4, 8, 4, 8),
