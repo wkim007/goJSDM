@@ -584,14 +584,7 @@ function createNodeTemplate(fieldTemplate) {
               width: 212,
               wrap: go.TextBlock.None,
               overflow: go.TextBlock.OverflowClip
-            }).bind("text", "name"),
-            new go.TextBlock({
-              stroke: "rgba(239, 246, 255, 0.74)",
-              font: "700 15px Inter, system-ui, sans-serif",
-              text: "×",
-              alignment: go.Spot.Right,
-              textAlign: "right"
-            })
+            }).bind("text", "name")
           )
         ),
         new go.Panel("Vertical", {
