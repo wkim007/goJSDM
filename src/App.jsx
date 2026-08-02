@@ -641,7 +641,7 @@ function createNodeTemplate(fieldTemplate) {
             stretch: go.GraphObject.Horizontal,
             margin: new go.Margin(10, 0, 10, 0)
           })
-            .bind("visible", "fields", (fields) => fields.some((field) => field.pk) && fields.some((field) => !field.pk))
+            .bind("visible", "fields", (fields) => fields.some((field) => !field.pk))
             .add(
               new go.Panel("Spot", {
                 stretch: go.GraphObject.Horizontal,
