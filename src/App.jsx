@@ -827,6 +827,16 @@ function buildModelData(diagram) {
   };
 }
 
+function createRelationshipLink({ sourceKey, targetKey, identifying }) {
+  return {
+    key: `rel_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    from: sourceKey,
+    to: targetKey,
+    text: "1:N",
+    identifying
+  };
+}
+
 function App() {
   const diagramDivRef = useRef(null);
   const paletteDivRef = useRef(null);
@@ -843,6 +853,8 @@ function App() {
   const [debugMessages, setDebugMessages] = useState([]);
   const [leftRailWidth, setLeftRailWidth] = useState(LEFT_RAIL_DEFAULT);
   const [rightRailWidth, setRightRailWidth] = useState(RIGHT_RAIL_DEFAULT);
+  const [activeDiagramTool, setActiveDiagramTool] = useState(null);
+  const relationshipModeRef = useRef(null);
 
   useEffect(() => {
     const handlePointerMove = (event) => {
@@ -1068,6 +1080,40 @@ function App() {
       }
 
       const part = event.subject.part;
+      const relationshipMode = relationshipModeRef.current;
+      if (relationshipMode && part instanceof go.Node && part.data?.key && !clickedFieldRow) {
+        if (part.data.key === relationshipMode.sourceKey) {
+          logDebug(`relationship tool -> source ${part.data.key} reselected, waiting for target`);
+          return;
+        }
+
+        const currentModel = buildModelData(diagram);
+        const duplicateLink = currentModel.linkDataArray.some(
+          (link) =>
+            link.from === relationshipMode.sourceKey &&
+            link.to === part.data.key &&
+            !!link.identifying === (relationshipMode.type === "identifying")
+        );
+
+        if (duplicateLink) {
+          logDebug(`relationship tool -> link already exists from ${relationshipMode.sourceKey} to ${part.data.key}`);
+          clearDiagramToolMode();
+          return;
+        }
+
+        currentModel.linkDataArray.push(
+          createRelationshipLink({
+            sourceKey: relationshipMode.sourceKey,
+            targetKey: part.data.key,
+            identifying: relationshipMode.type === "identifying"
+          })
+        );
+        applyModelToDiagram(currentModel);
+        logDebug(`relationship created -> ${relationshipMode.sourceKey} to ${part.data.key} (${relationshipMode.type})`);
+        clearDiagramToolMode();
+        return;
+      }
+
       if (part instanceof go.Node && part.data) {
         logDebug(`click -> ${part.data.key} | target=${describeObject(event.subject)}`);
       } else if (part instanceof go.Link) {
@@ -1156,6 +1202,37 @@ function App() {
     applyModelToDiagram(nextModel);
   };
 
+  const clearDiagramToolMode = () => {
+    relationshipModeRef.current = null;
+    setActiveDiagramTool(null);
+  };
+
+  const startRelationshipMode = (type) => {
+    const diagram = diagramRef.current;
+    if (!(diagram instanceof go.Diagram)) {
+      return;
+    }
+
+    const selectedPart = diagram.selection.first();
+    if (!(selectedPart instanceof go.Node) || !selectedPart.data?.key) {
+      setDebugMessages((current) => [
+        `${new Date().toLocaleTimeString()}: relationship tool -> select a source entity first`,
+        ...current
+      ].slice(0, 16));
+      return;
+    }
+
+    relationshipModeRef.current = {
+      type,
+      sourceKey: selectedPart.data.key
+    };
+    setActiveDiagramTool(type);
+    setDebugMessages((current) => [
+      `${new Date().toLocaleTimeString()}: relationship tool armed -> ${type} from ${selectedPart.data.key}`,
+      ...current
+    ].slice(0, 16));
+  };
+
   const autoLayout = () => {
     const diagram = diagramRef.current;
     if (!(diagram instanceof go.Diagram)) {
@@ -1212,8 +1289,22 @@ function App() {
               <button
                 key={item.id}
                 type="button"
-                className={`tool-tile${item.id === "materialized" ? " tool-tile--wide-label" : ""}`}
-                onClick={item.id === "entity" ? addEntity : undefined}
+                className={`tool-tile${item.id === "materialized" ? " tool-tile--wide-label" : ""}${
+                  activeDiagramTool === item.id ? " tool-tile--active" : ""
+                }`}
+                onClick={() => {
+                  if (item.id === "entity") {
+                    addEntity();
+                    return;
+                  }
+                  if (item.id === "identifying") {
+                    if (activeDiagramTool === "identifying") {
+                      clearDiagramToolMode();
+                      return;
+                    }
+                    startRelationshipMode("identifying");
+                  }
+                }}
                 title={item.tooltip}
                 aria-label={item.tooltip}
               >

@@ -206,7 +206,17 @@ body.is-resizing-panels {
     0 8px 22px rgba(12, 37, 44, 0.32);
 }
 
+.tool-tile--active {
+  border-color: rgba(113, 247, 195, 0.72);
+  background: linear-gradient(180deg, rgba(69, 98, 121, 0.98), rgba(73, 103, 129, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 0 1px rgba(113, 247, 195, 0.2),
+    0 10px 26px rgba(12, 37, 44, 0.34);
+}
+
 .tool-tile:hover .tool-tile__icon,
+.tool-tile--active .tool-tile__icon,
 .tool-tile:focus-visible .tool-tile__icon {
   background: rgba(16, 28, 39, 0.96);
   color: #9fffd8;
