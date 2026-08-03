@@ -22,6 +22,17 @@ const LEFT_RAIL_MAX = 520;
 const RIGHT_RAIL_MIN = 260;
 const RIGHT_RAIL_MAX = 560;
 
+const DIAGRAM_BOX_ITEMS = [
+  { id: "entity", label: "Entity", tooltip: "Add Entity", icon: "entity" },
+  { id: "annotation", label: "Annotation", tooltip: "Add Annotation", icon: "annotation" },
+  { id: "view", label: "View", tooltip: "Add View", icon: "view" },
+  { id: "identifying", label: "Identifying", tooltip: "Add Identifying Relation", icon: "identifying" },
+  { id: "non-identifying", label: "Non-Identifying", tooltip: "Add Non-Identifying Relation", icon: "nonIdentifying" },
+  { id: "materialized", label: "View/Materialized Rel.", tooltip: "Add View or Materialized Relation", icon: "materialized" }
+];
+
+const DRAWING_BOX_ITEMS = [{ id: "drawing", label: "Drawing", tooltip: "Add Drawing", icon: "drawing" }];
+
 function cloneModel(source = initialModel) {
   return {
     nodeDataArray: structuredClone(source.nodeDataArray),
@@ -42,6 +53,86 @@ function createGraphLinksModel(source) {
   graphModel.copiesArrays = true;
   graphModel.copiesArrayObjects = true;
   return graphModel;
+}
+
+function ToolGlyph({ icon }) {
+  const shared = {
+    width: 18,
+    height: 18,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "1.8",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": "true"
+  };
+
+  switch (icon) {
+    case "entity":
+      return (
+        <svg {...shared}>
+          <rect x="4" y="4" width="6" height="6" rx="1.2" />
+          <rect x="14" y="4" width="6" height="6" rx="1.2" />
+          <rect x="4" y="14" width="6" height="6" rx="1.2" />
+          <rect x="14" y="14" width="6" height="6" rx="1.2" />
+        </svg>
+      );
+    case "annotation":
+      return (
+        <svg {...shared}>
+          <path d="M8 8h8" />
+          <path d="M8 12h8" />
+          <path d="M8 16h5" />
+          <rect x="4" y="4" width="16" height="16" rx="3" />
+        </svg>
+      );
+    case "view":
+      return (
+        <svg {...shared}>
+          <rect x="3.5" y="5" width="17" height="4" rx="1.5" />
+          <rect x="3.5" y="10.5" width="7" height="8.5" rx="1.5" />
+          <rect x="13.5" y="10.5" width="7" height="3.5" rx="1.5" />
+          <rect x="13.5" y="15.5" width="7" height="3.5" rx="1.5" />
+        </svg>
+      );
+    case "identifying":
+      return (
+        <svg {...shared}>
+          <path d="M7 7l10 10" />
+          <path d="M9 17h8v-8" />
+          <path d="M7 17l-2-2" />
+          <path d="M17 7l2 2" />
+        </svg>
+      );
+    case "nonIdentifying":
+      return (
+        <svg {...shared}>
+          <path d="M6 12h12" />
+          <path d="M15 9l3 3-3 3" />
+          <path d="M6 9h3" />
+          <path d="M6 15h3" />
+        </svg>
+      );
+    case "materialized":
+      return (
+        <svg {...shared}>
+          <circle cx="7" cy="12" r="1.4" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+          <circle cx="17" cy="12" r="1.4" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case "drawing":
+      return (
+        <svg {...shared}>
+          <path d="M8 6h8l2 2v8l-2 2H8l-2-2V8l2-2z" />
+          <path d="M10 9l4 6" />
+          <path d="M14 9l-4 6" />
+        </svg>
+      );
+    default:
+      return null;
+  }
 }
 
 class FieldDraggingTool extends go.DraggingTool {
@@ -1109,6 +1200,52 @@ function App() {
             <h2>Palette</h2>
           </div>
           <div ref={paletteDivRef} className="palette-component" />
+        </div>
+
+        <div className="panel">
+          <div className="panel-header">
+            <p className="eyebrow">Canvas Tools</p>
+            <h2>Diagram Box</h2>
+          </div>
+          <div className="tool-grid">
+            {DIAGRAM_BOX_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`tool-tile${item.id === "materialized" ? " tool-tile--wide-label" : ""}`}
+                onClick={item.id === "entity" ? addEntity : undefined}
+                title={item.tooltip}
+                aria-label={item.tooltip}
+              >
+                <span className="tool-tile__icon">
+                  <ToolGlyph icon={item.icon} />
+                </span>
+                <span className="tool-tile__label">{item.label}</span>
+                <span className="tool-tile__tooltip">{item.tooltip}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="tool-box-subsection">
+            <h3>Drawing Box</h3>
+            <div className="tool-grid tool-grid--single">
+              {DRAWING_BOX_ITEMS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="tool-tile tool-tile--compact"
+                  title={item.tooltip}
+                  aria-label={item.tooltip}
+                >
+                  <span className="tool-tile__icon">
+                    <ToolGlyph icon={item.icon} />
+                  </span>
+                  <span className="tool-tile__label">{item.label}</span>
+                  <span className="tool-tile__tooltip">{item.tooltip}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="panel compact">
