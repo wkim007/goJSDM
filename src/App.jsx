@@ -794,7 +794,7 @@ function createLinkTemplate() {
       isPanelMain: true,
       stroke: "#88d6dc",
       strokeWidth: 2.4
-    }),
+    }).bind("strokeDashArray", "identifying", (identifying) => (identifying === false ? [7, 5] : null)),
     new go.Shape({
       toArrow: "Standard",
       fill: "#88d6dc",
@@ -1187,19 +1187,28 @@ function App() {
   };
 
   const addEntity = () => {
-    const nextModel = cloneModel(model);
-    const index = nextModel.nodeDataArray.length + 1;
-    nextModel.nodeDataArray.push({
+    const diagram = diagramRef.current;
+    if (!(diagram instanceof go.Diagram)) {
+      return;
+    }
+
+    const index = diagram.model.nodeDataArray.length + 1;
+    const viewportCenter = diagram.viewportBounds.center;
+    const offset = (index % 4) * 36;
+    const newNode = {
       key: `table_${Date.now()}`,
       name: `new_table_${index}`,
       color: "#2563eb",
-      loc: `${80 + index * 30} ${80 + index * 24}`,
+      loc: `${(viewportCenter.x + offset).toFixed(1)} ${(viewportCenter.y + offset).toFixed(1)}`,
       fields: [
         { name: "id", type: "uuid", pk: true, nullable: false },
         { name: "created_at", type: "timestamp", nullable: false }
       ]
-    });
-    applyModelToDiagram(nextModel);
+    };
+
+    diagram.startTransaction("Add Entity");
+    diagram.model.addNodeData(newNode);
+    diagram.commitTransaction("Add Entity");
   };
 
   const clearDiagramToolMode = () => {
@@ -1297,12 +1306,12 @@ function App() {
                     addEntity();
                     return;
                   }
-                  if (item.id === "identifying") {
-                    if (activeDiagramTool === "identifying") {
+                  if (item.id === "identifying" || item.id === "non-identifying") {
+                    if (activeDiagramTool === item.id) {
                       clearDiagramToolMode();
                       return;
                     }
-                    startRelationshipMode("identifying");
+                    startRelationshipMode(item.id);
                   }
                 }}
                 title={item.tooltip}
