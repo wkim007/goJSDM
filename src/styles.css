@@ -174,6 +174,10 @@ body.is-resizing-panels {
   font-weight: 700;
 }
 
+.drawing-box-shell {
+  position: relative;
+}
+
 .tool-tile {
   position: relative;
   display: flex;
@@ -299,6 +303,70 @@ body.is-resizing-panels {
 .tool-tile:focus-visible .tool-tile__tooltip {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+.diagram-shape-palette {
+  position: relative;
+  margin-top: 12px;
+  z-index: 20;
+  width: 232px;
+  padding: 10px;
+  border: 1px solid rgba(122, 145, 171, 0.22);
+  border-radius: 16px;
+  background: rgba(18, 28, 42, 0.98);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34);
+}
+
+.diagram-shape-palette-title {
+  margin-bottom: 8px;
+  color: #dce7f5;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.diagram-shape-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.diagram-shape-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 66px;
+  padding: 8px 6px;
+  border: 1px solid rgba(122, 145, 171, 0.2);
+  border-radius: 12px;
+  background: #23354d;
+  color: #eff5ff;
+  font: inherit;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.diagram-shape-option:hover,
+.diagram-shape-option:focus-visible {
+  background: #30425c;
+  border-color: rgba(140, 255, 184, 0.52);
+  box-shadow: inset 0 0 0 1px rgba(150, 255, 183, 0.3), 0 0 16px rgba(81, 236, 146, 0.16);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.diagram-shape-option__icon {
+  width: 32px;
+  height: 32px;
+}
+
+.diagram-shape-option span:last-child {
+  font-size: 0.78rem;
+  line-height: 1.1;
+  text-align: center;
 }
 
 .panel-header {

@@ -15,6 +15,15 @@ const emptySelection = {
   fields: []
 };
 
+function normalizeSelectionData(data) {
+  return {
+    key: data?.key || "",
+    name: data?.name || data?.text || "",
+    color: data?.color || "#94a3b8",
+    fields: Array.isArray(data?.fields) ? data.fields : []
+  };
+}
+
 const LEFT_RAIL_DEFAULT = 280;
 const RIGHT_RAIL_DEFAULT = 360;
 const LEFT_RAIL_MIN = 220;
@@ -32,6 +41,41 @@ const DIAGRAM_BOX_ITEMS = [
 ];
 
 const DRAWING_BOX_ITEMS = [{ id: "drawing", label: "Drawing", tooltip: "Add Drawing", icon: "drawing" }];
+const DRAWING_SHAPE_ITEMS = [
+  { id: "rectangle", label: "Rectangle" },
+  { id: "round-rectangle", label: "Round Rectangle" },
+  { id: "ellipse", label: "Ellipse" },
+  { id: "diamond", label: "Diamond" },
+  { id: "hexagon", label: "Hexagon" },
+  { id: "octagon", label: "Octagon" },
+  { id: "parallelogram", label: "Parallelogram" },
+  { id: "pentagon", label: "Pentagon" },
+  { id: "star", label: "Star" },
+  { id: "cross", label: "Cross" },
+  { id: "triangle-up", label: "Triangle Up" },
+  { id: "triangle-down", label: "Triangle Down" },
+  { id: "triangle-left", label: "Triangle Left" },
+  { id: "triangle-right", label: "Triangle Right" },
+  { id: "connector", label: "Connector" }
+];
+
+const DRAWING_FIGURE_MAP = {
+  rectangle: { figure: "Rectangle", size: [160, 96] },
+  "round-rectangle": { figure: "RoundedRectangle", size: [160, 96], corner: 18 },
+  ellipse: { figure: "Ellipse", size: [160, 96] },
+  diamond: { figure: "Diamond", size: [150, 110] },
+  hexagon: { geometry: "F M20 0 L80 0 100 50 80 100 20 100 0 50z", size: [162, 104] },
+  octagon: { geometry: "F M30 0 L70 0 100 30 100 70 70 100 30 100 0 70 0 30z", size: [158, 104] },
+  parallelogram: { geometry: "F M22 0 L100 0 78 100 0 100z", size: [166, 98] },
+  pentagon: { geometry: "F M50 0 L100 38 82 100 18 100 0 38z", size: [154, 112] },
+  star: { geometry: "F M50 0 L61 35 98 35 68 57 79 91 50 70 21 91 32 57 2 35 39 35z", size: [164, 126] },
+  cross: { geometry: "F M38 0 L62 0 62 38 100 38 100 62 62 62 62 100 38 100 38 62 0 62 0 38 38 38z", size: [136, 136] },
+  "triangle-up": { figure: "TriangleUp", size: [150, 118] },
+  "triangle-down": { figure: "TriangleDown", size: [150, 118] },
+  "triangle-left": { figure: "TriangleLeft", size: [150, 118] },
+  "triangle-right": { figure: "TriangleRight", size: [150, 118] },
+  connector: { geometry: "M0 50 L100 50", size: [180, 28], lineOnly: true }
+};
 
 function cloneModel(source = initialModel) {
   return {
@@ -53,6 +97,10 @@ function createGraphLinksModel(source) {
   graphModel.copiesArrays = true;
   graphModel.copiesArrayObjects = true;
   return graphModel;
+}
+
+function getDrawingFigureConfig(shapeId) {
+  return DRAWING_FIGURE_MAP[shapeId] ?? DRAWING_FIGURE_MAP.rectangle;
 }
 
 function ToolGlyph({ icon }) {
@@ -130,6 +178,55 @@ function ToolGlyph({ icon }) {
           <path d="M14 9l-4 6" />
         </svg>
       );
+    default:
+      return null;
+  }
+}
+
+function ShapeGlyph({ shape }) {
+  const shared = {
+    width: 18,
+    height: 18,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "1.8",
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": "true"
+  };
+
+  switch (shape) {
+    case "rectangle":
+      return <svg {...shared}><rect x="5" y="8" width="14" height="8" rx="1.5" /></svg>;
+    case "round-rectangle":
+      return <svg {...shared}><rect x="5" y="7" width="14" height="10" rx="3.5" /></svg>;
+    case "ellipse":
+      return <svg {...shared}><ellipse cx="12" cy="12" rx="6.5" ry="5.2" /></svg>;
+    case "diamond":
+      return <svg {...shared}><path d="M12 5l6 7-6 7-6-7z" /></svg>;
+    case "hexagon":
+      return <svg {...shared}><path d="M8 6h8l4 6-4 6H8l-4-6z" /></svg>;
+    case "octagon":
+      return <svg {...shared}><path d="M9 4h6l5 5v6l-5 5H9l-5-5V9z" /></svg>;
+    case "parallelogram":
+      return <svg {...shared}><path d="M8 6h10l-2 12H6z" /></svg>;
+    case "pentagon":
+      return <svg {...shared}><path d="M12 4l7 5v7l-7 4-7-4V9z" /></svg>;
+    case "star":
+      return <svg {...shared}><path d="M12 4l2.2 4.7 5.2.5-3.9 3.5 1.1 5.1-4.6-2.6-4.6 2.6 1.1-5.1-3.9-3.5 5.2-.5z" /></svg>;
+    case "cross":
+      return <svg {...shared}><path d="M12 6v12" /><path d="M6 12h12" /></svg>;
+    case "triangle-up":
+      return <svg {...shared}><path d="M12 6l6 12H6z" /></svg>;
+    case "triangle-down":
+      return <svg {...shared}><path d="M6 6h12l-6 12z" /></svg>;
+    case "triangle-left":
+      return <svg {...shared}><path d="M6 12l12-6v12z" /></svg>;
+    case "triangle-right":
+      return <svg {...shared}><path d="M18 12L6 6v12z" /></svg>;
+    case "connector":
+      return <svg {...shared}><path d="M6 18L18 6" /></svg>;
     default:
       return null;
   }
@@ -242,6 +339,14 @@ class FieldDraggingTool extends go.DraggingTool {
     return null;
   }
 
+  findDrawingPartFromMouseDown() {
+    const part = this.mouseDownObject?.part;
+    if (part instanceof go.Node && part.data?.category === "drawing") {
+      return part;
+    }
+    return null;
+  }
+
   rememberMouseDown(obj, point) {
     this.mouseDownObject = obj || null;
     this.mouseDownPoint = point ? point.copy() : null;
@@ -274,7 +379,8 @@ class FieldDraggingTool extends go.DraggingTool {
     const downInput = diagram.firstInput;
     const fieldRow = this.findFieldRowFromMouseDown() || this.findFieldRowFromInput(downInput);
     const headerHandle = this.findHeaderHandleFromMouseDown() || this.findHeaderHandleFromInput(downInput);
-    const result = fieldRow !== null || headerHandle !== null;
+    const drawingPart = this.findDrawingPartFromMouseDown();
+    const result = fieldRow !== null || headerHandle !== null || drawingPart !== null;
 
     if (this.logDebug) {
       this.logDebug(
@@ -282,7 +388,7 @@ class FieldDraggingTool extends go.DraggingTool {
           downInput?.targetObject || null
         )} | currentTarget=${this.describeObject(input.targetObject || null)} | fieldRow=${
           fieldRow?.data?.name || "none"
-        } | header=${headerHandle ? "yes" : "no"}`
+        } | header=${headerHandle ? "yes" : "no"} | drawing=${drawingPart?.data?.key || "no"}`
       );
     }
 
@@ -294,6 +400,7 @@ class FieldDraggingTool extends go.DraggingTool {
     const downInput = diagram.firstInput;
     const point = this.mouseDownPoint || downInput.documentPoint;
     const obj = this.findFieldRowFromMouseDown() || this.findFieldRowFromInput(downInput);
+    const drawingPart = this.findDrawingPartFromMouseDown();
 
     if (
       obj !== null &&
@@ -312,6 +419,13 @@ class FieldDraggingTool extends go.DraggingTool {
         this.logDebug(`field drag prepared -> ${obj.data.name} | source=${this.describeObject(downInput?.targetObject || null)}`);
       }
       return tempPart;
+    }
+
+    if (drawingPart !== null) {
+      if (this.logDebug) {
+        this.logDebug(`drawing drag prepared -> ${drawingPart.data?.key || "drawing"}`);
+      }
+      return drawingPart;
     }
 
     const headerHandle = this.findHeaderHandleFromMouseDown() || this.findHeaderHandleFromInput(downInput);
@@ -375,6 +489,10 @@ class FieldDraggingTool extends go.DraggingTool {
 
   doDeactivate() {
     if (this.temporaryPart === null) {
+      this.sourceNode = null;
+      this.draggedField = null;
+      this.mouseDownObject = null;
+      this.mouseDownPoint = null;
       return super.doDeactivate();
     }
     const diagram = this.diagram;
@@ -631,6 +749,69 @@ function makeCornerResizeAdornment() {
   );
 }
 
+function createDrawingTemplate() {
+  const drawingBody = new go.Panel("Spot", { name: "DRAWING_BODY" }).add(
+    new go.Shape({
+      name: "DRAWING_SHAPE",
+      fill: "#edf1f7",
+      stroke: "#c9d4e6",
+      strokeWidth: 2,
+      parameter1: 16,
+      desiredSize: new go.Size(160, 96)
+    })
+      .bind("figure", "drawingShape", (shapeId) => getDrawingFigureConfig(shapeId).figure || "Rectangle")
+      .bind("geometry", "drawingShape", (shapeId) => {
+        const config = getDrawingFigureConfig(shapeId);
+        return config.geometry ? go.Geometry.parse(config.geometry, true) : null;
+      })
+      .bind("desiredSize", "drawingShape", (shapeId) => {
+        const [width, height] = getDrawingFigureConfig(shapeId).size;
+        return new go.Size(width, height);
+      })
+      .bind("fill", "drawingShape", (shapeId) => (getDrawingFigureConfig(shapeId).lineOnly ? null : "#edf1f7"))
+      .bind("parameter1", "drawingShape", (shapeId) => getDrawingFigureConfig(shapeId).corner || 16),
+    new go.TextBlock({
+      editable: false,
+      textAlign: "center",
+      stroke: "#182435",
+      font: "600 15px Inter, system-ui, sans-serif",
+      wrap: go.TextBlock.WrapFit,
+      maxSize: new go.Size(120, 80),
+      alignment: go.Spot.Center
+    })
+      .bind("text", "text")
+      .bind("visible", "drawingShape", (shapeId) => !getDrawingFigureConfig(shapeId).lineOnly)
+  );
+
+  return new go.Node(
+    "Spot",
+    {
+      locationSpot: go.Spot.Center,
+      selectionObjectName: "DRAWING_BODY",
+      movable: true,
+      resizable: true,
+      resizeObjectName: "DRAWING_SHAPE",
+      resizeAdornmentTemplate: makeCornerResizeAdornment(),
+      cursor: "move",
+      shadowVisible: true,
+      shadowColor: "rgba(0, 0, 0, 0.28)",
+      shadowOffset: new go.Point(0, 12),
+      selectionChanged: (part) => {
+        const shape = part.findObject("DRAWING_SHAPE");
+        if (!shape) {
+          return;
+        }
+        shape.stroke = part.isSelected ? "#f1bf52" : "#c9d4e6";
+        shape.strokeWidth = part.isSelected ? 2.5 : 2;
+      }
+    },
+    new go.Binding("location", "loc", go.Point.parse).makeTwoWay(go.Point.stringify),
+    new go.Binding("desiredSize", "size", go.Size.parse).makeTwoWay(go.Size.stringify)
+  ).add(
+    drawingBody
+  );
+}
+
 function createNodeTemplate(fieldTemplate) {
   return new go.Node(
     "Auto",
@@ -837,6 +1018,21 @@ function createRelationshipLink({ sourceKey, targetKey, identifying }) {
   };
 }
 
+function createDrawingNodeData({ shapeId, viewportCenter, index }) {
+  const config = getDrawingFigureConfig(shapeId);
+  const offset = (index % 4) * 28;
+  return {
+    key: `drawing_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    category: "drawing",
+    name: "Drawing",
+    text: "Drawing",
+    drawingShape: shapeId,
+    color: "#edf1f7",
+    loc: `${(viewportCenter.x + offset).toFixed(1)} ${(viewportCenter.y + offset).toFixed(1)}`,
+    size: go.Size.stringify(new go.Size(config.size[0], config.size[1]))
+  };
+}
+
 function App() {
   const diagramDivRef = useRef(null);
   const paletteDivRef = useRef(null);
@@ -854,6 +1050,7 @@ function App() {
   const [leftRailWidth, setLeftRailWidth] = useState(LEFT_RAIL_DEFAULT);
   const [rightRailWidth, setRightRailWidth] = useState(RIGHT_RAIL_DEFAULT);
   const [activeDiagramTool, setActiveDiagramTool] = useState(null);
+  const [drawingPaletteOpen, setDrawingPaletteOpen] = useState(false);
   const relationshipModeRef = useRef(null);
 
   useEffect(() => {
@@ -940,7 +1137,7 @@ function App() {
       }
       const part = diagram.selection.first();
       if (part instanceof go.Node && part.data) {
-        setSelectedNode(structuredClone(part.data));
+        setSelectedNode(normalizeSelectionData(structuredClone(part.data)));
         logDebug(
           `selection changed -> ${part.data.key} at ${part.location.x.toFixed(1)}, ${part.location.y.toFixed(1)} movable=${part.movable}`
         );
@@ -1007,6 +1204,7 @@ function App() {
       cursor: "move"
     });
     diagram.nodeTemplate = createNodeTemplate(fieldTemplate);
+    diagram.nodeTemplateMap.add("drawing", createDrawingTemplate());
     diagram.linkTemplate = createLinkTemplate();
 
     const draggingTool = diagram.toolManager.draggingTool;
@@ -1053,6 +1251,7 @@ function App() {
       }),
       nodeTemplate: createNodeTemplate(makeFieldTemplate())
     });
+    palette.nodeTemplateMap.add("drawing", createDrawingTemplate());
 
     const overview = new go.Overview(overviewDivRef.current, {
       observed: diagram,
@@ -1242,6 +1441,28 @@ function App() {
     ].slice(0, 16));
   };
 
+  const handleChooseDrawingShape = (shapeId) => {
+    const diagram = diagramRef.current;
+    if (!(diagram instanceof go.Diagram)) {
+      return;
+    }
+
+    const drawingNode = createDrawingNodeData({
+      shapeId,
+      viewportCenter: diagram.viewportBounds.center,
+      index: diagram.model.nodeDataArray.length + 1
+    });
+
+    diagram.startTransaction("Add Drawing");
+    diagram.model.addNodeData(drawingNode);
+    diagram.commitTransaction("Add Drawing");
+    setDrawingPaletteOpen(false);
+    setDebugMessages((current) => [
+      `${new Date().toLocaleTimeString()}: drawing created -> ${shapeId}`,
+      ...current
+    ].slice(0, 16));
+  };
+
   const autoLayout = () => {
     const diagram = diagramRef.current;
     if (!(diagram instanceof go.Diagram)) {
@@ -1328,12 +1549,14 @@ function App() {
 
           <div className="tool-box-subsection">
             <h3>Drawing Box</h3>
-            <div className="tool-grid tool-grid--single">
+            <div className="drawing-box-shell">
+              <div className="tool-grid tool-grid--single">
               {DRAWING_BOX_ITEMS.map((item) => (
                 <button
                   key={item.id}
                   type="button"
-                  className="tool-tile tool-tile--compact"
+                  className={`tool-tile tool-tile--compact${drawingPaletteOpen ? " tool-tile--active" : ""}`}
+                  onClick={() => setDrawingPaletteOpen((current) => !current)}
                   title={item.tooltip}
                   aria-label={item.tooltip}
                 >
@@ -1344,6 +1567,30 @@ function App() {
                   <span className="tool-tile__tooltip">{item.tooltip}</span>
                 </button>
               ))}
+              </div>
+
+              {drawingPaletteOpen ? (
+                <div className="diagram-shape-palette">
+                  <div className="diagram-shape-palette-title">Choose Shape</div>
+                  <div className="diagram-shape-palette-grid">
+                    {DRAWING_SHAPE_ITEMS.map((shape) => (
+                      <button
+                        key={shape.id}
+                        type="button"
+                        className="diagram-shape-option"
+                        onClick={() => handleChooseDrawingShape(shape.id)}
+                        title={shape.label}
+                        aria-label={shape.label}
+                      >
+                        <span className="tool-tile__icon diagram-shape-option__icon">
+                          <ShapeGlyph shape={shape.id} />
+                        </span>
+                        <span>{shape.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1412,17 +1659,21 @@ function App() {
                 <span className="swatch" style={{ backgroundColor: selectedNode.color }} />
                 <span>{selectedNode.key}</span>
               </div>
-              <div className="field-list">
-                {selectedNode.fields.map((field) => (
-                  <div key={`${selectedNode.key}-${field.name}`} className="field-card">
-                    <div>
-                      <strong>{field.name}</strong>
-                      <span>{field.type}</span>
+              {selectedNode.fields.length > 0 ? (
+                <div className="field-list">
+                  {selectedNode.fields.map((field) => (
+                    <div key={`${selectedNode.key}-${field.name}`} className="field-card">
+                      <div>
+                        <strong>{field.name}</strong>
+                        <span>{field.type}</span>
+                      </div>
+                      <small>{fieldBadges(field).join(" · ")}</small>
                     </div>
-                    <small>{fieldBadges(field).join(" · ")}</small>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="empty-state">This selected object does not have columns.</p>
+              )}
             </div>
           ) : (
             <p className="empty-state">Click a table in the canvas to inspect its structure here.</p>
