@@ -1087,8 +1087,7 @@ function App() {
           return;
         }
 
-        const currentModel = buildModelData(diagram);
-        const duplicateLink = currentModel.linkDataArray.some(
+        const duplicateLink = diagram.model.linkDataArray.some(
           (link) =>
             link.from === relationshipMode.sourceKey &&
             link.to === part.data.key &&
@@ -1101,14 +1100,15 @@ function App() {
           return;
         }
 
-        currentModel.linkDataArray.push(
+        diagram.startTransaction("Add Relationship");
+        diagram.model.addLinkData(
           createRelationshipLink({
             sourceKey: relationshipMode.sourceKey,
             targetKey: part.data.key,
             identifying: relationshipMode.type === "identifying"
           })
         );
-        applyModelToDiagram(currentModel);
+        diagram.commitTransaction("Add Relationship");
         logDebug(`relationship created -> ${relationshipMode.sourceKey} to ${part.data.key} (${relationshipMode.type})`);
         clearDiagramToolMode();
         return;
