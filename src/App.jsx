@@ -716,12 +716,15 @@ function makeFieldTemplate() {
       }).bind("text", "", (field) => (field && field.pk ? "PK" : "COL"))
     ),
     new go.TextBlock({
+      name: "FIELD_NAME",
       column: 1,
       width: 154,
       margin: new go.Margin(6, 8, 6, 0),
       stroke: "#ffffff",
-      font: "600 13px Inter, system-ui, sans-serif"
-    }).bind("text", "name"),
+      font: "600 13px Inter, system-ui, sans-serif",
+      editable: true,
+      isMultiline: false
+    }).bind(new go.Binding("text", "name").makeTwoWay()),
     new go.TextBlock({
       column: 2,
       width: 102,
@@ -812,7 +815,14 @@ function createDrawingTemplate() {
   );
 }
 
-function createNodeTemplate(fieldTemplate) {
+function createNodeTemplate(fieldTemplate, options = {}) {
+  const {
+    enableAddAttributeZone = false,
+    onAddAttributeHoldStart = null,
+    onAddAttributeHoldCancel = null,
+    onAddAttributeHoldMove = null
+  } = options;
+
   return new go.Node(
     "Auto",
     {
@@ -987,7 +997,62 @@ function createNodeTemplate(fieldTemplate) {
             defaultAlignment: go.Spot.Left,
             defaultRowSeparatorStroke: "rgba(133, 160, 191, 0.12)",
             itemTemplate: fieldTemplate
-          }).bind("itemArray", "fields", (fields) => fields.filter((field) => !field.pk))
+          }).bind("itemArray", "fields", (fields) => fields.filter((field) => !field.pk)),
+          new go.Panel("Spot", {
+            name: "ADD_ATTRIBUTE_ZONE",
+            visible: enableAddAttributeZone,
+            stretch: go.GraphObject.Horizontal,
+            height: 30,
+            margin: new go.Margin(12, 0, 0, 0),
+            cursor: "pointer",
+            isActionable: true,
+            actionDown: (event, panel) => {
+              if (typeof onAddAttributeHoldStart === "function") {
+                onAddAttributeHoldStart(event, panel);
+              }
+            },
+            actionMove: (event, panel) => {
+              if (typeof onAddAttributeHoldMove === "function") {
+                onAddAttributeHoldMove(event, panel);
+              }
+            },
+            actionUp: (event, panel) => {
+              if (typeof onAddAttributeHoldCancel === "function") {
+                onAddAttributeHoldCancel(event, panel, "up");
+              }
+            },
+            actionCancel: (event, panel) => {
+              if (typeof onAddAttributeHoldCancel === "function") {
+                onAddAttributeHoldCancel(event, panel, "cancel");
+              }
+            },
+            mouseLeave: (event, panel) => {
+              if (typeof onAddAttributeHoldCancel === "function") {
+                onAddAttributeHoldCancel(event, panel, "leave");
+              }
+            }
+          }).add(
+            new go.Shape("RoundedRectangle", {
+              stretch: go.GraphObject.Fill,
+              parameter1: 9,
+              fill: "rgba(36, 48, 64, 0.34)",
+              stroke: "rgba(148, 163, 184, 0.22)",
+              strokeDashArray: [3, 4]
+            }),
+            new go.TextBlock({
+              text: "Hold 2s to add attribute",
+              alignment: go.Spot.Center,
+              stroke: "rgba(189, 203, 221, 0.82)",
+              font: "600 11px Inter, system-ui, sans-serif"
+            }),
+            new go.TextBlock({
+              text: "∕∕",
+              alignment: go.Spot.BottomRight,
+              margin: new go.Margin(0, 8, 4, 0),
+              stroke: "rgba(208, 223, 243, 0.72)",
+              font: "700 12px Inter, system-ui, sans-serif"
+            })
+          )
         )
       )
     );
@@ -1086,6 +1151,23 @@ function createDrawingNodeData({ shapeId, viewportCenter, index }) {
   };
 }
 
+function createAttributeField(nodeData) {
+  const existingNames = new Set((nodeData?.fields ?? []).map((field) => String(field?.name ?? "").toLowerCase()));
+  let index = (nodeData?.fields?.length ?? 0) + 1;
+  let name = `column_${index}`;
+
+  while (existingNames.has(name.toLowerCase())) {
+    index += 1;
+    name = `column_${index}`;
+  }
+
+  return {
+    name,
+    type: "varchar(50)",
+    nullable: true
+  };
+}
+
 function createDrawingConnectorTemplate() {
   return new go.Link({
     category: "drawingConnector",
@@ -1122,6 +1204,7 @@ function App() {
   const overviewRef = useRef(null);
   const isApplyingRef = useRef(false);
   const resizeStateRef = useRef(null);
+  const addAttributeHoldRef = useRef({ timerId: null, nodeKey: "" });
 
   const [model, setModel] = useState(() => cloneModel());
   const [selectedNode, setSelectedNode] = useState(emptySelection);
@@ -1242,6 +1325,122 @@ function App() {
       updateSelection();
     };
 
+    const findFieldNameTextBlock = (obj, fieldName) => {
+      if (!obj) {
+        return null;
+      }
+      if (obj.name === "FIELD_NAME" && obj.panel?.data?.name === fieldName) {
+        return obj;
+      }
+      if (obj.elements) {
+        const it = obj.elements;
+        while (it.next()) {
+          const match = findFieldNameTextBlock(it.value, fieldName);
+          if (match) {
+            return match;
+          }
+        }
+      }
+      return null;
+    };
+
+    const clearAddAttributeHold = (reason = "clear") => {
+      const current = addAttributeHoldRef.current;
+      if (current.timerId) {
+        window.clearTimeout(current.timerId);
+        logDebug(
+          `attribute hold cleared -> node=${current.nodeKey || "none"} reason=${reason} elapsed=${Date.now() - (current.startedAt || Date.now())}ms`
+        );
+      }
+      addAttributeHoldRef.current = { timerId: null, nodeKey: "", startedAt: 0, startPoint: "" };
+    };
+
+    const addAttributeToNode = (nodeKey) => {
+      const activeDiagram = diagramRef.current;
+      if (!(activeDiagram instanceof go.Diagram) || !nodeKey) {
+        return;
+      }
+
+      const nodeData = activeDiagram.model.findNodeDataForKey(nodeKey);
+      if (!nodeData || nodeData.category === "drawing") {
+        return;
+      }
+
+      const nextField = createAttributeField(nodeData);
+      activeDiagram.commit(() => {
+        activeDiagram.model.setDataProperty(nodeData, "fields", [...(nodeData.fields ?? []), nextField]);
+        activeDiagram.model.setDataProperty(nodeData, "selectedFieldName", nextField.name);
+        activeDiagram.model.updateTargetBindings(nodeData);
+      }, "Add Attribute");
+      logDebug(`attribute added -> ${nodeKey}.${nextField.name}`);
+
+      window.setTimeout(() => {
+        const node = activeDiagram.findNodeForKey(nodeKey);
+        const textBlock = findFieldNameTextBlock(node, nextField.name);
+        if (!node || !textBlock) {
+          logDebug(`attribute edit start failed -> ${nodeKey}.${nextField.name}`);
+          return;
+        }
+        activeDiagram.select(node);
+        activeDiagram.commandHandler.editTextBlock(textBlock);
+        logDebug(`attribute edit start -> ${nodeKey}.${nextField.name}`);
+      }, 0);
+    };
+
+    const handleAddAttributeHoldStart = (event, panel) => {
+      const node = panel.part;
+      if (!(node instanceof go.Node) || !node.data?.key) {
+        logDebug("attribute hold ignored -> no node on actionDown");
+        return;
+      }
+
+      clearAddAttributeHold("rearm");
+      const point = event?.diagram?.lastInput?.documentPoint;
+      addAttributeHoldRef.current = {
+        nodeKey: node.data.key,
+        startedAt: Date.now(),
+        startPoint: point ? `${point.x.toFixed(1)},${point.y.toFixed(1)}` : "",
+        timerId: window.setTimeout(() => {
+          const current = addAttributeHoldRef.current;
+          logDebug(
+            `attribute hold fired -> node=${current.nodeKey || "none"} armedFor=${Date.now() - (current.startedAt || Date.now())}ms`
+          );
+          const activeNodeKey = current.nodeKey;
+          clearAddAttributeHold("fired");
+          addAttributeToNode(activeNodeKey);
+        }, 2000)
+      };
+      logDebug(
+        `attribute hold armed -> node=${node.data.key} point=${addAttributeHoldRef.current.startPoint || "unknown"} delay=2000ms`
+      );
+    };
+
+    const handleAddAttributeHoldMove = (event, panel) => {
+      const current = addAttributeHoldRef.current;
+      if (!current.timerId) {
+        return;
+      }
+      const point = event?.diagram?.lastInput?.documentPoint;
+      const inside = point ? panel.actualBounds.containsPoint(point) : false;
+      logDebug(
+        `attribute hold move -> node=${current.nodeKey || "none"} point=${point ? `${point.x.toFixed(1)},${point.y.toFixed(1)}` : "unknown"} inside=${inside}`
+      );
+      if (!inside) {
+        clearAddAttributeHold("move-outside");
+      }
+    };
+
+    const handleAddAttributeHoldCancel = (event, panel, reason = "cancel") => {
+      const current = addAttributeHoldRef.current;
+      const point = event?.diagram?.lastInput?.documentPoint;
+      logDebug(
+        `attribute hold cancel -> node=${current.nodeKey || panel.part?.data?.key || "none"} reason=${reason} point=${
+          point ? `${point.x.toFixed(1)},${point.y.toFixed(1)}` : "unknown"
+        } active=${Boolean(current.timerId)}`
+      );
+      clearAddAttributeHold(reason);
+    };
+
     const diagram = new go.Diagram(diagramDivRef.current, {
       allowMove: true,
       "undoManager.isEnabled": true,
@@ -1250,6 +1449,7 @@ function App() {
       "linkingTool.portGravity": 20,
       "relinkingTool.portGravity": 20,
       "commandHandler.copiesTree": false,
+      "toolManager.holdDelay": 2000,
       "grid.visible": true,
       "grid.gridCellSize": new go.Size(20, 20),
       "toolManager.mouseWheelBehavior": go.ToolManager.WheelZoom
@@ -1284,7 +1484,12 @@ function App() {
       stroke: "#38bdf8",
       cursor: "move"
     });
-    diagram.nodeTemplate = createNodeTemplate(fieldTemplate);
+    diagram.nodeTemplate = createNodeTemplate(fieldTemplate, {
+      enableAddAttributeZone: true,
+      onAddAttributeHoldStart: handleAddAttributeHoldStart,
+      onAddAttributeHoldCancel: handleAddAttributeHoldCancel,
+      onAddAttributeHoldMove: handleAddAttributeHoldMove
+    });
     diagram.nodeTemplateMap.add("drawing", createDrawingTemplate());
     diagram.linkTemplate = createLinkTemplate();
     diagram.linkTemplateMap.add("drawingConnector", createDrawingConnectorTemplate());
@@ -1476,6 +1681,10 @@ function App() {
     pushStateFromDiagram();
 
     return () => {
+      if (addAttributeHoldRef.current.timerId) {
+        window.clearTimeout(addAttributeHoldRef.current.timerId);
+        addAttributeHoldRef.current = { timerId: null, nodeKey: "" };
+      }
       overview.div = null;
       palette.div = null;
       diagram.div = null;
