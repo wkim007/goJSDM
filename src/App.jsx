@@ -1018,6 +1018,15 @@ function createRelationshipLink({ sourceKey, targetKey, identifying }) {
   };
 }
 
+function createDrawingConnectorLink({ sourceKey, targetKey }) {
+  return {
+    key: `drawing_connector_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    category: "drawingConnector",
+    from: sourceKey,
+    to: targetKey
+  };
+}
+
 function createDrawingNodeData({ shapeId, viewportCenter, index }) {
   const config = getDrawingFigureConfig(shapeId);
   const offset = (index % 4) * 28;
@@ -1031,6 +1040,33 @@ function createDrawingNodeData({ shapeId, viewportCenter, index }) {
     loc: `${(viewportCenter.x + offset).toFixed(1)} ${(viewportCenter.y + offset).toFixed(1)}`,
     size: go.Size.stringify(new go.Size(config.size[0], config.size[1]))
   };
+}
+
+function createDrawingConnectorTemplate() {
+  return new go.Link({
+    category: "drawingConnector",
+    selectionAdorned: true,
+    routing: go.Link.Normal,
+    curve: go.Link.Bezier,
+    corner: 8,
+    curviness: 26,
+    selectable: true,
+    relinkableFrom: true,
+    relinkableTo: true,
+    reshapable: true,
+    resegmentable: true
+  }).add(
+    new go.Shape({
+      isPanelMain: true,
+      stroke: "transparent",
+      strokeWidth: 14
+    }),
+    new go.Shape({
+      isPanelMain: true,
+      stroke: "#7ea6ff",
+      strokeWidth: 2.6
+    })
+  );
 }
 
 function App() {
@@ -1052,6 +1088,7 @@ function App() {
   const [activeDiagramTool, setActiveDiagramTool] = useState(null);
   const [drawingPaletteOpen, setDrawingPaletteOpen] = useState(false);
   const relationshipModeRef = useRef(null);
+  const drawingConnectorModeRef = useRef(null);
 
   useEffect(() => {
     const handlePointerMove = (event) => {
@@ -1206,6 +1243,7 @@ function App() {
     diagram.nodeTemplate = createNodeTemplate(fieldTemplate);
     diagram.nodeTemplateMap.add("drawing", createDrawingTemplate());
     diagram.linkTemplate = createLinkTemplate();
+    diagram.linkTemplateMap.add("drawingConnector", createDrawingConnectorTemplate());
 
     const draggingTool = diagram.toolManager.draggingTool;
     const originalDoActivate = draggingTool.doActivate.bind(draggingTool);
@@ -1279,6 +1317,36 @@ function App() {
       }
 
       const part = event.subject.part;
+      const drawingConnectorMode = drawingConnectorModeRef.current;
+      if (drawingConnectorMode && part instanceof go.Node && part.data?.key && !clickedFieldRow) {
+        if (part.data.key === drawingConnectorMode.sourceKey) {
+          logDebug(`drawing connector -> source ${part.data.key} reselected, waiting for target`);
+          return;
+        }
+
+        const duplicateConnector = diagram.model.linkDataArray.some(
+          (link) => link.category === "drawingConnector" && link.from === drawingConnectorMode.sourceKey && link.to === part.data.key
+        );
+
+        if (duplicateConnector) {
+          logDebug(`drawing connector -> link already exists from ${drawingConnectorMode.sourceKey} to ${part.data.key}`);
+          clearDiagramToolMode();
+          return;
+        }
+
+        diagram.startTransaction("Add Drawing Connector");
+        diagram.model.addLinkData(
+          createDrawingConnectorLink({
+            sourceKey: drawingConnectorMode.sourceKey,
+            targetKey: part.data.key
+          })
+        );
+        diagram.commitTransaction("Add Drawing Connector");
+        logDebug(`drawing connector created -> ${drawingConnectorMode.sourceKey} to ${part.data.key}`);
+        clearDiagramToolMode();
+        return;
+      }
+
       const relationshipMode = relationshipModeRef.current;
       if (relationshipMode && part instanceof go.Node && part.data?.key && !clickedFieldRow) {
         if (part.data.key === relationshipMode.sourceKey) {
@@ -1412,6 +1480,7 @@ function App() {
 
   const clearDiagramToolMode = () => {
     relationshipModeRef.current = null;
+    drawingConnectorModeRef.current = null;
     setActiveDiagramTool(null);
   };
 
@@ -1444,6 +1513,28 @@ function App() {
   const handleChooseDrawingShape = (shapeId) => {
     const diagram = diagramRef.current;
     if (!(diagram instanceof go.Diagram)) {
+      return;
+    }
+
+    if (shapeId === "connector") {
+      const selectedPart = diagram.selection.first();
+      if (!(selectedPart instanceof go.Node) || selectedPart.data?.category !== "drawing" || !selectedPart.data?.key) {
+        setDebugMessages((current) => [
+          `${new Date().toLocaleTimeString()}: drawing connector -> select a source drawing object first`,
+          ...current
+        ].slice(0, 16));
+        return;
+      }
+
+      drawingConnectorModeRef.current = {
+        sourceKey: selectedPart.data.key
+      };
+      setActiveDiagramTool("connector");
+      setDrawingPaletteOpen(false);
+      setDebugMessages((current) => [
+        `${new Date().toLocaleTimeString()}: drawing connector armed -> from ${selectedPart.data.key}`,
+        ...current
+      ].slice(0, 16));
       return;
     }
 
@@ -1577,7 +1668,7 @@ function App() {
                       <button
                         key={shape.id}
                         type="button"
-                        className="diagram-shape-option"
+                        className={`diagram-shape-option${activeDiagramTool === "connector" && shape.id === "connector" ? " tool-tile--active" : ""}`}
                         onClick={() => handleChooseDrawingShape(shape.id)}
                         title={shape.label}
                         aria-label={shape.label}
