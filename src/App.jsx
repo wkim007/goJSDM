@@ -655,98 +655,91 @@ class FieldDraggingTool extends go.DraggingTool {
 }
 
 function makeFieldTemplate(onDeleteField = null) {
-  return new go.Panel(
-    "TableRow",
-    {
-      name: "FIELD_ROW",
-      background: "rgba(0, 0, 0, 0)",
-      cursor: "grab",
-      contextClick: (_, panel) => {
-        const node = panel.part;
-        if (!(node instanceof go.Node) || !node.data || !panel.data) {
-          return;
-        }
-        const model = node.diagram?.model;
-        if (!model) {
-          return;
-        }
-        model.nodeDataArray.forEach((nodeData) => {
-          const nextValue = nodeData === node.data ? panel.data.name : "";
-          if ((nodeData.selectedFieldName || "") !== nextValue) {
-            model.setDataProperty(nodeData, "selectedFieldName", nextValue);
-            model.updateTargetBindings(nodeData);
-          }
-        });
-      },
-      contextMenu:
-        typeof onDeleteField === "function"
-          ? new go.Adornment("Vertical").add(
-              new go.Panel("Auto", {
-                cursor: "pointer",
-                click: (_, obj) => {
-                  const row = obj.part?.adornedObject;
-                  const node = row?.part;
-                  const fieldData = row?.data;
-                  if (!(node instanceof go.Node) || !node.data || !fieldData) {
-                    return;
-                  }
-                  onDeleteField(node, fieldData);
-                }
-              }).add(
-                new go.Shape("RoundedRectangle", {
-                  parameter1: 10,
-                  fill: "#111827",
-                  stroke: "rgba(148, 163, 184, 0.22)",
-                  strokeWidth: 1
-                }),
-                new go.TextBlock({
-                  margin: new go.Margin(10, 18, 10, 18),
-                  stroke: "#f8fafc",
-                  font: "600 13px Inter, system-ui, sans-serif",
-                  text: "Delete"
-                })
-              )
-            )
-          : null,
-      click: (_, panel) => {
-        const node = panel.part;
-        if (!(node instanceof go.Node) || !node.data || !panel.data) {
-          return;
-        }
-        const model = node.diagram?.model;
-        if (!model) {
-          return;
-        }
-        model.nodeDataArray.forEach((nodeData) => {
-          const nextValue = nodeData === node.data ? panel.data.name : "";
-          if ((nodeData.selectedFieldName || "") !== nextValue) {
-            model.setDataProperty(nodeData, "selectedFieldName", nextValue);
-            model.updateTargetBindings(nodeData);
-          }
-        });
+  const row = new go.Panel("Auto", {
+    name: "FIELD_ROW",
+    background: "rgba(0, 0, 0, 0)",
+    stretch: go.GraphObject.Horizontal,
+    minSize: new go.Size(NaN, 32),
+    cursor: "grab",
+    contextClick: (_, panel) => {
+      const node = panel.part;
+      if (!(node instanceof go.Node) || !node.data || !panel.data) {
+        return;
       }
+      const model = node.diagram?.model;
+      if (!model) {
+        return;
+      }
+      model.nodeDataArray.forEach((nodeData) => {
+        const nextValue = nodeData === node.data ? panel.data.name : "";
+        if ((nodeData.selectedFieldName || "") !== nextValue) {
+          model.setDataProperty(nodeData, "selectedFieldName", nextValue);
+          model.updateTargetBindings(nodeData);
+        }
+      });
+    },
+    contextMenu:
+      typeof onDeleteField === "function"
+        ? new go.Adornment("Vertical").add(
+            new go.Panel("Auto", {
+              cursor: "pointer",
+              click: (_, obj) => {
+                const adorned = obj.part?.adornedObject;
+                const node = adorned?.part;
+                const fieldData = adorned?.data;
+                if (!(node instanceof go.Node) || !node.data || !fieldData) {
+                  return;
+                }
+                onDeleteField(node, fieldData);
+              }
+            }).add(
+              new go.Shape("RoundedRectangle", {
+                parameter1: 10,
+                fill: "#111827",
+                stroke: "rgba(148, 163, 184, 0.22)",
+                strokeWidth: 1
+              }),
+              new go.TextBlock({
+                margin: new go.Margin(10, 18, 10, 18),
+                stroke: "#f8fafc",
+                font: "600 13px Inter, system-ui, sans-serif",
+                text: "Delete"
+              })
+            )
+          )
+        : null,
+    click: (_, panel) => {
+      const node = panel.part;
+      if (!(node instanceof go.Node) || !node.data || !panel.data) {
+        return;
+      }
+      const model = node.diagram?.model;
+      if (!model) {
+        return;
+      }
+      model.nodeDataArray.forEach((nodeData) => {
+        const nextValue = nodeData === node.data ? panel.data.name : "";
+        if ((nodeData.selectedFieldName || "") !== nextValue) {
+          model.setDataProperty(nodeData, "selectedFieldName", nextValue);
+          model.updateTargetBindings(nodeData);
+        }
+      });
     }
-  ).add(
-    new go.Shape("RoundedRectangle", {
-      column: 0,
-      columnSpan: 3,
-      stretch: go.GraphObject.Fill,
-      fill: "rgba(41, 55, 72, 0.18)",
-      stroke: "rgba(0, 0, 0, 0)",
-      strokeWidth: 0,
-      parameter1: 10
-    })
-      .bind("fill", "", (field, shape) => {
-        const nodeData = shape.part?.data;
-        return nodeData && nodeData.selectedFieldName === field.name ? "rgba(74, 130, 139, 0.92)" : "rgba(41, 55, 72, 0.18)";
-      })
-      .bind("stroke", "", (field, shape) => {
-        const nodeData = shape.part?.data;
-        return nodeData && nodeData.selectedFieldName === field.name ? "rgba(121, 208, 201, 0.58)" : "rgba(0, 0, 0, 0)";
-      }),
+  });
+
+  const table = new go.Panel("Table", {
+    stretch: go.GraphObject.Horizontal,
+    margin: new go.Margin(3, 10, 3, 10),
+    defaultAlignment: go.Spot.Left
+  });
+  table.addColumnDefinition(0, { width: 74 });
+  table.addColumnDefinition(1, { stretch: go.GraphObject.Horizontal });
+  table.addColumnDefinition(2, { width: 144, alignment: go.Spot.Right });
+
+  table.add(
     new go.Panel("Auto", {
       column: 0,
-      margin: new go.Margin(6, 8, 6, 12)
+      margin: new go.Margin(0, 14, 0, 0)
     }).add(
       new go.Shape("RoundedRectangle", {
         fill: "#334155",
@@ -765,22 +758,45 @@ function makeFieldTemplate(onDeleteField = null) {
     new go.TextBlock({
       name: "FIELD_NAME",
       column: 1,
-      width: 154,
-      margin: new go.Margin(6, 8, 6, 0),
+      margin: new go.Margin(0, 12, 0, 0),
       stroke: "#ffffff",
       font: "600 13px Inter, system-ui, sans-serif",
       editable: true,
-      isMultiline: false
+      isMultiline: false,
+      wrap: go.TextBlock.None,
+      overflow: go.TextBlock.OverflowClip
     }).bind(new go.Binding("text", "name").makeTwoWay()),
     new go.TextBlock({
       column: 2,
-      width: 102,
-      margin: new go.Margin(6, 10, 6, 8),
+      margin: new go.Margin(0, 0, 0, 6),
       stroke: "#aec2da",
       font: "12px ui-monospace, SFMono-Regular, Menlo, monospace",
-      textAlign: "right"
+      textAlign: "right",
+      wrap: go.TextBlock.None,
+      overflow: go.TextBlock.OverflowClip
     }).bind("text", "type")
   );
+
+  row.add(
+    new go.Shape("RoundedRectangle", {
+      stretch: go.GraphObject.Fill,
+      fill: "rgba(41, 55, 72, 0.18)",
+      stroke: "rgba(0, 0, 0, 0)",
+      strokeWidth: 0,
+      parameter1: 10
+    })
+      .bind("fill", "", (field, shape) => {
+        const nodeData = shape.part?.data;
+        return nodeData && nodeData.selectedFieldName === field.name ? "rgba(74, 130, 139, 0.92)" : "rgba(41, 55, 72, 0.18)";
+      })
+      .bind("stroke", "", (field, shape) => {
+        const nodeData = shape.part?.data;
+        return nodeData && nodeData.selectedFieldName === field.name ? "rgba(121, 208, 201, 0.58)" : "rgba(0, 0, 0, 0)";
+      }),
+    table
+  );
+
+  return row;
 }
 
 function makeCornerResizeAdornment() {
@@ -887,7 +903,8 @@ function createNodeTemplate(fieldTemplate, options = {}) {
         const titleWidth = title ? Math.max(title.naturalBounds.width, title.measuredBounds.width, 120) : 120;
         const closeWidth = closeButton ? Math.max(closeButton.naturalBounds.width, closeButton.measuredBounds.width, 14) : 14;
         const minimumHeaderWidth = 16 + titleWidth + 12 + closeWidth + 16 + 14;
-        const minimumCardWidth = Math.max(300, Math.ceil(minimumHeaderWidth));
+        const minimumFieldWidth = 74 + 24 + 144 + 120;
+        const minimumCardWidth = Math.max(360, Math.ceil(minimumHeaderWidth), minimumFieldWidth);
         return new go.Rect(
           newRect.x,
           newRect.y,
@@ -938,14 +955,20 @@ function createNodeTemplate(fieldTemplate, options = {}) {
         stroke: "rgba(122, 145, 172, 0.2)",
         strokeWidth: 1,
         minSize: new go.Size(300, NaN)
-      }),
-      new go.Panel("Vertical", { stretch: go.GraphObject.Fill }).add(
+      }).bind(new go.Binding("desiredSize", "size", parseNodeSize).makeTwoWay(go.Size.stringify)),
+      new go.Panel("Vertical", {
+        stretch: go.GraphObject.Fill,
+        alignment: go.Spot.TopLeft,
+        defaultAlignment: go.Spot.Left,
+        defaultStretch: go.GraphObject.Horizontal
+      }).bind("width", "size", (size) => computeEntityInnerWidth(size, 320, 0)).add(
         new go.Panel("Auto", {
           name: "ENTITY_DRAG_HANDLE",
+          alignment: go.Spot.Left,
           stretch: go.GraphObject.Horizontal,
           cursor: "move",
           minSize: new go.Size(NaN, 50)
-        }).add(
+        }).bind("width", "size", (size) => computeEntityInnerWidth(size, 320, 22)).add(
           new go.Shape("RoundedRectangle", {
             parameter1: 16,
             stroke: "rgba(136, 159, 185, 0.12)",
@@ -955,9 +978,13 @@ function createNodeTemplate(fieldTemplate, options = {}) {
             minSize: new go.Size(220, 50)
           }),
           new go.Panel("Table", {
+            alignment: go.Spot.Left,
             stretch: go.GraphObject.Horizontal,
             defaultAlignment: go.Spot.Left
-          }).add(
+          })
+            .addColumnDefinition(0, { stretch: go.GraphObject.Horizontal })
+            .addColumnDefinition(1, { width: 26, alignment: go.Spot.Right })
+            .add(
             new go.TextBlock({
               name: "ENTITY_TITLE",
               row: 0,
@@ -966,7 +993,6 @@ function createNodeTemplate(fieldTemplate, options = {}) {
               stroke: "#eff6ff",
               font: "900 15px Inter, system-ui, sans-serif",
               editable: false,
-              width: 228,
               wrap: go.TextBlock.None,
               overflow: go.TextBlock.OverflowClip
             }).bind("text", "name"),
@@ -998,15 +1024,17 @@ function createNodeTemplate(fieldTemplate, options = {}) {
         ),
         new go.Panel("Vertical", {
           name: "FIELDS",
+          alignment: go.Spot.TopLeft,
           padding: new go.Margin(10, 10, 12, 10),
           defaultAlignment: go.Spot.Left,
+          defaultStretch: go.GraphObject.Horizontal,
           stretch: go.GraphObject.Horizontal
-        }).add(
-          new go.Panel("Table", {
+        }).bind("width", "size", (size) => computeEntityInnerWidth(size, 320, 22)).add(
+          new go.Panel("Vertical", {
             name: "PK_FIELDS",
             stretch: go.GraphObject.Horizontal,
             defaultAlignment: go.Spot.Left,
-            defaultRowSeparatorStroke: "rgba(133, 160, 191, 0.12)",
+            defaultStretch: go.GraphObject.Horizontal,
             itemTemplate: fieldTemplate
           }).bind("itemArray", "fields", (fields) => fields.filter((field) => field.pk)),
           new go.Panel("Vertical", {
@@ -1038,11 +1066,11 @@ function createNodeTemplate(fieldTemplate, options = {}) {
                 })
               )
             ),
-          new go.Panel("Table", {
+          new go.Panel("Vertical", {
             name: "NONPK_FIELDS",
             stretch: go.GraphObject.Horizontal,
             defaultAlignment: go.Spot.Left,
-            defaultRowSeparatorStroke: "rgba(133, 160, 191, 0.12)",
+            defaultStretch: go.GraphObject.Horizontal,
             itemTemplate: fieldTemplate
           }).bind("itemArray", "fields", (fields) => fields.filter((field) => !field.pk)),
           new go.Panel("Spot", {
@@ -1240,6 +1268,19 @@ function createDrawingConnectorTemplate() {
       strokeWidth: 2.6
     })
   );
+}
+
+function parseNodeSize(size) {
+  if (!size) {
+    return new go.Size(NaN, NaN);
+  }
+  return go.Size.parse(size);
+}
+
+function computeEntityInnerWidth(size, fallback = 320, padding = 22) {
+  const parsed = parseNodeSize(size);
+  const width = Number.isFinite(parsed.width) ? parsed.width : fallback;
+  return Math.max(width - padding, 280);
 }
 
 function App() {
