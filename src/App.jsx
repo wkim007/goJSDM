@@ -654,13 +654,60 @@ class FieldDraggingTool extends go.DraggingTool {
   }
 }
 
-function makeFieldTemplate() {
+function makeFieldTemplate(onDeleteField = null) {
   return new go.Panel(
     "TableRow",
     {
       name: "FIELD_ROW",
       background: "rgba(0, 0, 0, 0)",
       cursor: "grab",
+      contextClick: (_, panel) => {
+        const node = panel.part;
+        if (!(node instanceof go.Node) || !node.data || !panel.data) {
+          return;
+        }
+        const model = node.diagram?.model;
+        if (!model) {
+          return;
+        }
+        model.nodeDataArray.forEach((nodeData) => {
+          const nextValue = nodeData === node.data ? panel.data.name : "";
+          if ((nodeData.selectedFieldName || "") !== nextValue) {
+            model.setDataProperty(nodeData, "selectedFieldName", nextValue);
+            model.updateTargetBindings(nodeData);
+          }
+        });
+      },
+      contextMenu:
+        typeof onDeleteField === "function"
+          ? new go.Adornment("Vertical").add(
+              new go.Panel("Auto", {
+                cursor: "pointer",
+                click: (_, obj) => {
+                  const row = obj.part?.adornedObject;
+                  const node = row?.part;
+                  const fieldData = row?.data;
+                  if (!(node instanceof go.Node) || !node.data || !fieldData) {
+                    return;
+                  }
+                  onDeleteField(node, fieldData);
+                }
+              }).add(
+                new go.Shape("RoundedRectangle", {
+                  parameter1: 10,
+                  fill: "#111827",
+                  stroke: "rgba(148, 163, 184, 0.22)",
+                  strokeWidth: 1
+                }),
+                new go.TextBlock({
+                  margin: new go.Margin(10, 18, 10, 18),
+                  stroke: "#f8fafc",
+                  font: "600 13px Inter, system-ui, sans-serif",
+                  text: "Delete"
+                })
+              )
+            )
+          : null,
       click: (_, panel) => {
         const node = panel.part;
         if (!(node instanceof go.Node) || !node.data || !panel.data) {
@@ -1378,13 +1425,40 @@ function App() {
         const node = activeDiagram.findNodeForKey(nodeKey);
         const textBlock = findFieldNameTextBlock(node, nextField.name);
         if (!node || !textBlock) {
-          logDebug(`attribute edit start failed -> ${nodeKey}.${nextField.name}`);
+        logDebug(`attribute edit start failed -> ${nodeKey}.${nextField.name}`);
           return;
         }
         activeDiagram.select(node);
         activeDiagram.commandHandler.editTextBlock(textBlock);
         logDebug(`attribute edit start -> ${nodeKey}.${nextField.name}`);
       }, 0);
+    };
+
+    const deleteFieldFromNode = (node, fieldData) => {
+      const activeDiagram = diagramRef.current;
+      if (!(activeDiagram instanceof go.Diagram) || !(node instanceof go.Node) || !node.data || !fieldData) {
+        return;
+      }
+
+      const nodeData = activeDiagram.model.findNodeDataForKey(node.data.key);
+      if (!nodeData) {
+        return;
+      }
+
+      const nextFields = (nodeData.fields ?? []).filter((field) => field !== fieldData);
+      if (nextFields.length === (nodeData.fields ?? []).length) {
+        logDebug(`field delete skipped -> ${node.data.key}.${fieldData.name}`);
+        return;
+      }
+
+      activeDiagram.commit(() => {
+        activeDiagram.model.setDataProperty(nodeData, "fields", nextFields);
+        if (nodeData.selectedFieldName === fieldData.name) {
+          activeDiagram.model.setDataProperty(nodeData, "selectedFieldName", "");
+        }
+        activeDiagram.model.updateTargetBindings(nodeData);
+      }, "Delete Attribute");
+      logDebug(`field deleted -> ${node.data.key}.${fieldData.name}`);
     };
 
     const handleAddAttributeHoldStart = (event, panel) => {
@@ -1459,7 +1533,7 @@ function App() {
       new go.Shape("LineH", { stroke: "rgba(148, 163, 184, 0.15)" }),
       new go.Shape("LineV", { stroke: "rgba(148, 163, 184, 0.15)" })
     );
-    const fieldTemplate = makeFieldTemplate();
+    const fieldTemplate = makeFieldTemplate(deleteFieldFromNode);
     const fieldDraggingTool = new FieldDraggingTool(fieldTemplate);
     fieldDraggingTool.logDebug = logDebug;
     diagram.toolManager.draggingTool = fieldDraggingTool;
