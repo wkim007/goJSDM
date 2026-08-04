@@ -824,6 +824,20 @@ function createNodeTemplate(fieldTemplate) {
       resizable: true,
       resizeObjectName: "CARD",
       resizeAdornmentTemplate: makeCornerResizeAdornment(),
+      resizeComputation: (part, newRect) => {
+        const title = part.findObject("ENTITY_TITLE");
+        const closeButton = part.findObject("ENTITY_CLOSE");
+        const titleWidth = title ? Math.max(title.naturalBounds.width, title.measuredBounds.width, 120) : 120;
+        const closeWidth = closeButton ? Math.max(closeButton.naturalBounds.width, closeButton.measuredBounds.width, 14) : 14;
+        const minimumHeaderWidth = 16 + titleWidth + 12 + closeWidth + 16 + 14;
+        const minimumCardWidth = Math.max(300, Math.ceil(minimumHeaderWidth));
+        return new go.Rect(
+          newRect.x,
+          newRect.y,
+          Math.max(newRect.width, minimumCardWidth),
+          Math.max(newRect.height, 150)
+        );
+      },
       layoutConditions: go.Part.LayoutStandard & ~go.Part.LayoutNodeSized,
       fromSpot: go.Spot.LeftRightSides,
       toSpot: go.Spot.LeftRightSides,
@@ -863,36 +877,66 @@ function createNodeTemplate(fieldTemplate) {
       new go.Shape("RoundedRectangle", {
         name: "CARD",
         parameter1: 16,
-        fill: "#243142",
-        stroke: "rgba(133, 160, 191, 0.22)",
-        strokeWidth: 1.5,
+        fill: "#273243",
+        stroke: "rgba(122, 145, 172, 0.2)",
+        strokeWidth: 1,
         minSize: new go.Size(300, NaN)
       }),
       new go.Panel("Vertical", { stretch: go.GraphObject.Fill }).add(
         new go.Panel("Auto", {
           name: "ENTITY_DRAG_HANDLE",
           stretch: go.GraphObject.Horizontal,
-          cursor: "move"
+          cursor: "move",
+          minSize: new go.Size(NaN, 50)
         }).add(
           new go.Shape("RoundedRectangle", {
             parameter1: 16,
-            strokeWidth: 0,
+            stroke: "rgba(136, 159, 185, 0.12)",
+            strokeWidth: 1,
+            fill: "#273243",
             stretch: go.GraphObject.Fill,
-            minSize: new go.Size(220, 0),
-            margin: new go.Margin(0, 0, 0, 0)
-          }).bind("fill", "color"),
-          new go.Panel("Horizontal", {
+            minSize: new go.Size(220, 50)
+          }),
+          new go.Panel("Table", {
             stretch: go.GraphObject.Horizontal,
-            margin: new go.Margin(10, 14, 10, 14)
+            defaultAlignment: go.Spot.Left
           }).add(
             new go.TextBlock({
+              name: "ENTITY_TITLE",
+              row: 0,
+              column: 0,
+              margin: new go.Margin(13, 16, 12, 16),
               stroke: "#eff6ff",
-              font: "800 16px Inter, system-ui, sans-serif",
+              font: "900 15px Inter, system-ui, sans-serif",
               editable: false,
-              width: 212,
+              width: 228,
               wrap: go.TextBlock.None,
               overflow: go.TextBlock.OverflowClip
-            }).bind("text", "name")
+            }).bind("text", "name"),
+            new go.TextBlock({
+              name: "ENTITY_CLOSE",
+              row: 0,
+              column: 1,
+              text: "×",
+              margin: new go.Margin(12, 16, 11, 6),
+              stroke: "rgba(208, 223, 243, 0.72)",
+              font: "700 15px Inter, system-ui, sans-serif",
+              textAlign: "right",
+              cursor: "pointer",
+              isActionable: true,
+              click: (event, obj) => {
+                const part = obj.part;
+                const diagram = part?.diagram;
+                if (!(part instanceof go.Node) || !diagram) {
+                  return;
+                }
+                diagram.commit(() => {
+                  part.isSelected = true;
+                  diagram.commandHandler.deleteSelection();
+                }, "Delete Entity");
+                event.handled = true;
+              }
+            })
           )
         ),
         new go.Panel("Vertical", {
