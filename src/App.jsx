@@ -884,6 +884,7 @@ function createNodeTemplate(fieldTemplate, options = {}) {
     onAddAttributeHoldStart = null,
     onAddAttributeHoldCancel = null,
     onAddAttributeHoldMove = null,
+    onHeaderHoldEdit = null,
     variant = "entity"
   } = options;
 
@@ -977,7 +978,12 @@ function createNodeTemplate(fieldTemplate, options = {}) {
           alignment: go.Spot.Left,
           stretch: go.GraphObject.Horizontal,
           cursor: "move",
-          minSize: new go.Size(NaN, 50)
+          minSize: new go.Size(NaN, 50),
+          mouseHold: (event, panel) => {
+            if (typeof onHeaderHoldEdit === "function") {
+              onHeaderHoldEdit(event, panel);
+            }
+          }
         }).bind("width", "size", (size) => computeEntityInnerWidth(size, 320, 22)).add(
           new go.Shape("RoundedRectangle", {
             parameter1: 16,
@@ -1002,10 +1008,11 @@ function createNodeTemplate(fieldTemplate, options = {}) {
               margin: new go.Margin(13, 16, 12, 16),
               stroke: "#eff6ff",
               font: "900 15px Inter, system-ui, sans-serif",
-              editable: false,
+              editable: true,
+              isMultiline: false,
               wrap: go.TextBlock.None,
               overflow: go.TextBlock.OverflowClip
-            }).bind("text", "name"),
+            }).bind(new go.Binding("text", "name").makeTwoWay()),
             new go.TextBlock({
               name: "ENTITY_CLOSE",
               row: 0,
@@ -1484,6 +1491,14 @@ function App() {
       return null;
     };
 
+    const findEntityTitleTextBlock = (node) => {
+      if (!(node instanceof go.Node)) {
+        return null;
+      }
+      const title = node.findObject("ENTITY_TITLE");
+      return title instanceof go.TextBlock ? title : null;
+    };
+
     const clearAddAttributeHold = (reason = "clear") => {
       const current = addAttributeHoldRef.current;
       if (current.timerId) {
@@ -1608,6 +1623,27 @@ function App() {
       clearAddAttributeHold(reason);
     };
 
+    const handleHeaderHoldEdit = (event, panel) => {
+      const node = panel.part;
+      const activeDiagram = panel.diagram;
+      if (!(node instanceof go.Node) || !(activeDiagram instanceof go.Diagram) || !node.data?.key) {
+        logDebug("header hold ignored -> no node");
+        return;
+      }
+
+      const titleTextBlock = findEntityTitleTextBlock(node);
+      if (!titleTextBlock) {
+        logDebug(`header hold edit failed -> ${node.data.key} title missing`);
+        return;
+      }
+
+      clearAddAttributeHold("header-hold");
+      activeDiagram.select(node);
+      activeDiagram.commandHandler.editTextBlock(titleTextBlock);
+      logDebug(`header edit start -> ${node.data.key}`);
+      event.handled = true;
+    };
+
     const diagram = new go.Diagram(diagramDivRef.current, {
       allowMove: true,
       "undoManager.isEnabled": true,
@@ -1655,7 +1691,8 @@ function App() {
       enableAddAttributeZone: true,
       onAddAttributeHoldStart: handleAddAttributeHoldStart,
       onAddAttributeHoldCancel: handleAddAttributeHoldCancel,
-      onAddAttributeHoldMove: handleAddAttributeHoldMove
+      onAddAttributeHoldMove: handleAddAttributeHoldMove,
+      onHeaderHoldEdit: handleHeaderHoldEdit
     });
     diagram.nodeTemplateMap.add(
       "view",
@@ -1664,6 +1701,7 @@ function App() {
         onAddAttributeHoldStart: handleAddAttributeHoldStart,
         onAddAttributeHoldCancel: handleAddAttributeHoldCancel,
         onAddAttributeHoldMove: handleAddAttributeHoldMove,
+        onHeaderHoldEdit: handleHeaderHoldEdit,
         variant: "view"
       })
     );
