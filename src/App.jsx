@@ -883,8 +883,14 @@ function createNodeTemplate(fieldTemplate, options = {}) {
     enableAddAttributeZone = false,
     onAddAttributeHoldStart = null,
     onAddAttributeHoldCancel = null,
-    onAddAttributeHoldMove = null
+    onAddAttributeHoldMove = null,
+    variant = "entity"
   } = options;
+
+  const isViewVariant = variant === "view";
+  const defaultCardStroke = isViewVariant ? "rgba(103, 232, 249, 0.72)" : "rgba(122, 145, 172, 0.2)";
+  const hoverCardStroke = isViewVariant ? "rgba(165, 243, 252, 0.9)" : "rgba(232, 237, 245, 0.72)";
+  const cardDashArray = isViewVariant ? [4, 4] : null;
 
   return new go.Node(
     "Auto",
@@ -922,8 +928,9 @@ function createNodeTemplate(fieldTemplate, options = {}) {
       selectionChanged: (part) => {
         const card = part.findObject("CARD");
         if (card) {
-          card.stroke = part.isSelected ? "#f1bf52" : "rgba(133, 160, 191, 0.22)";
+          card.stroke = part.isSelected ? "#f1bf52" : defaultCardStroke;
           card.strokeWidth = part.isSelected ? 2 : 1.5;
+          card.strokeDashArray = part.isSelected ? cardDashArray : cardDashArray;
         }
       },
       mouseEnter: (_, node) => {
@@ -932,7 +939,8 @@ function createNodeTemplate(fieldTemplate, options = {}) {
         }
         const shape = node.findObject("CARD");
         if (shape) {
-          shape.stroke = "rgba(232, 237, 245, 0.72)";
+          shape.stroke = hoverCardStroke;
+          shape.strokeDashArray = cardDashArray;
         }
       },
       mouseLeave: (_, node) => {
@@ -941,7 +949,8 @@ function createNodeTemplate(fieldTemplate, options = {}) {
         }
         const shape = node.findObject("CARD");
         if (shape) {
-          shape.stroke = "rgba(133, 160, 191, 0.22)";
+          shape.stroke = defaultCardStroke;
+          shape.strokeDashArray = cardDashArray;
         }
       }
     },
@@ -952,8 +961,9 @@ function createNodeTemplate(fieldTemplate, options = {}) {
         name: "CARD",
         parameter1: 16,
         fill: "#273243",
-        stroke: "rgba(122, 145, 172, 0.2)",
+        stroke: defaultCardStroke,
         strokeWidth: 1,
+        strokeDashArray: cardDashArray,
         minSize: new go.Size(300, NaN)
       }).bind(new go.Binding("desiredSize", "size", parseNodeSize).makeTwoWay(go.Size.stringify)),
       new go.Panel("Vertical", {
@@ -1240,6 +1250,32 @@ function createAttributeField(nodeData) {
     name,
     type: "varchar(50)",
     nullable: true
+  };
+}
+
+function createEntityNodeData({ viewportCenter, index }) {
+  const offset = (index % 4) * 36;
+  return {
+    key: `table_${Date.now()}`,
+    name: `new_table_${index}`,
+    color: "#2563eb",
+    loc: `${(viewportCenter.x + offset).toFixed(1)} ${(viewportCenter.y + offset).toFixed(1)}`,
+    fields: [
+      { name: "id", type: "uuid", pk: true, nullable: false },
+      { name: "created_at", type: "timestamp", nullable: false }
+    ]
+  };
+}
+
+function createViewNodeData({ viewportCenter, index }) {
+  const offset = (index % 4) * 36;
+  return {
+    key: `view_${Date.now()}`,
+    category: "view",
+    name: "NewView",
+    color: "#67e8f9",
+    loc: `${(viewportCenter.x + offset).toFixed(1)} ${(viewportCenter.y + offset).toFixed(1)}`,
+    fields: [{ name: "Column1", type: "varchar(50)", nullable: true }]
   };
 }
 
@@ -1605,6 +1641,16 @@ function App() {
       onAddAttributeHoldCancel: handleAddAttributeHoldCancel,
       onAddAttributeHoldMove: handleAddAttributeHoldMove
     });
+    diagram.nodeTemplateMap.add(
+      "view",
+      createNodeTemplate(fieldTemplate, {
+        enableAddAttributeZone: true,
+        onAddAttributeHoldStart: handleAddAttributeHoldStart,
+        onAddAttributeHoldCancel: handleAddAttributeHoldCancel,
+        onAddAttributeHoldMove: handleAddAttributeHoldMove,
+        variant: "view"
+      })
+    );
     diagram.nodeTemplateMap.add("drawing", createDrawingTemplate());
     diagram.linkTemplate = createLinkTemplate();
     diagram.linkTemplateMap.add("drawingConnector", createDrawingConnectorTemplate());
@@ -1653,6 +1699,7 @@ function App() {
       }),
       nodeTemplate: createNodeTemplate(makeFieldTemplate())
     });
+    palette.nodeTemplateMap.add("view", createNodeTemplate(makeFieldTemplate(), { variant: "view" }));
     palette.nodeTemplateMap.add("drawing", createDrawingTemplate());
 
     const overview = new go.Overview(overviewDivRef.current, {
@@ -1829,21 +1876,26 @@ function App() {
 
     const index = diagram.model.nodeDataArray.length + 1;
     const viewportCenter = diagram.viewportBounds.center;
-    const offset = (index % 4) * 36;
-    const newNode = {
-      key: `table_${Date.now()}`,
-      name: `new_table_${index}`,
-      color: "#2563eb",
-      loc: `${(viewportCenter.x + offset).toFixed(1)} ${(viewportCenter.y + offset).toFixed(1)}`,
-      fields: [
-        { name: "id", type: "uuid", pk: true, nullable: false },
-        { name: "created_at", type: "timestamp", nullable: false }
-      ]
-    };
+    const newNode = createEntityNodeData({ viewportCenter, index });
 
     diagram.startTransaction("Add Entity");
     diagram.model.addNodeData(newNode);
     diagram.commitTransaction("Add Entity");
+  };
+
+  const addView = () => {
+    const diagram = diagramRef.current;
+    if (!(diagram instanceof go.Diagram)) {
+      return;
+    }
+
+    const index = diagram.model.nodeDataArray.length + 1;
+    const viewportCenter = diagram.viewportBounds.center;
+    const newNode = createViewNodeData({ viewportCenter, index });
+
+    diagram.startTransaction("Add View");
+    diagram.model.addNodeData(newNode);
+    diagram.commitTransaction("Add View");
   };
 
   const clearDiagramToolMode = () => {
@@ -1984,6 +2036,10 @@ function App() {
                 onClick={() => {
                   if (item.id === "entity") {
                     addEntity();
+                    return;
+                  }
+                  if (item.id === "view") {
+                    addView();
                     return;
                   }
                   if (item.id === "identifying" || item.id === "non-identifying") {
