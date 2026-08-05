@@ -1169,7 +1169,18 @@ function createLinkTemplate() {
       isPanelMain: true,
       stroke: "#88d6dc",
       strokeWidth: 2.4
-    }).bind("strokeDashArray", "identifying", (identifying) => (identifying === false ? [7, 5] : null)),
+    }).bind("strokeDashArray", "", (link) => {
+      if (link?.relationshipType === "materialized") {
+        return [2, 4];
+      }
+      if (link?.relationshipType === "non-identifying") {
+        return [7, 5];
+      }
+      if (link?.relationshipType === "identifying") {
+        return null;
+      }
+      return link?.identifying === false ? [7, 5] : null;
+    }),
     new go.Shape({
       toArrow: "Standard",
       fill: "#88d6dc",
@@ -1202,13 +1213,18 @@ function buildModelData(diagram) {
   };
 }
 
-function createRelationshipLink({ sourceKey, targetKey, identifying }) {
+function createRelationshipLink({ sourceKey, targetKey, relationshipType }) {
+  const normalizedType =
+    relationshipType === "materialized" || relationshipType === "non-identifying" || relationshipType === "identifying"
+      ? relationshipType
+      : "identifying";
   return {
     key: `rel_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     from: sourceKey,
     to: targetKey,
     text: "1:N",
-    identifying
+    identifying: normalizedType === "identifying",
+    relationshipType: normalizedType
   };
 }
 
@@ -1769,7 +1785,7 @@ function App() {
           (link) =>
             link.from === relationshipMode.sourceKey &&
             link.to === part.data.key &&
-            !!link.identifying === (relationshipMode.type === "identifying")
+            (link.relationshipType || (link.identifying === false ? "non-identifying" : "identifying")) === relationshipMode.type
         );
 
         if (duplicateLink) {
@@ -1783,7 +1799,7 @@ function App() {
           createRelationshipLink({
             sourceKey: relationshipMode.sourceKey,
             targetKey: part.data.key,
-            identifying: relationshipMode.type === "identifying"
+            relationshipType: relationshipMode.type
           })
         );
         diagram.commitTransaction("Add Relationship");
@@ -2042,7 +2058,7 @@ function App() {
                     addView();
                     return;
                   }
-                  if (item.id === "identifying" || item.id === "non-identifying") {
+                  if (item.id === "identifying" || item.id === "non-identifying" || item.id === "materialized") {
                     if (activeDiagramTool === item.id) {
                       clearDiagramToolMode();
                       return;
